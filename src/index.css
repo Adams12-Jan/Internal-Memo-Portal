@@ -1,0 +1,145 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;750&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Custom global dark mode overrides */
+.dark {
+  color-scheme: dark;
+}
+
+.dark #full-app-root {
+  background-color: #090d16 !important; /* rich navy dark slate */
+  color: #f8fafc !important;
+}
+
+.dark #main-desktop-sidebar {
+  background-color: #0d1527 !important;
+  border-color: #1e293b !important;
+}
+
+.dark #app-primary-header {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+}
+
+.dark #app-primary-footer {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+  color: #94a3b8 !important;
+}
+
+/* Card backgrounds and borders */
+.dark .bg-white,
+.dark .bg-slate-50\/50,
+.dark .bg-blue-50\/50,
+.dark .bg-slate-50 {
+  background-color: #0d1527 !important; /* card background */
+  color: #f1f5f9 !important;
+  border-color: #1e293b !important;
+}
+
+/* Override borders */
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-slate-150,
+.dark .border-slate-300,
+.dark .border-blue-100 {
+  border-color: #1e293b !important;
+}
+
+/* Text elements */
+.dark .text-slate-800,
+.dark .text-slate-900,
+.dark .text-slate-805,
+.dark .text-slate-705,
+.dark .text-slate-700,
+.dark .text-slate-600 {
+  color: #e2e8f0 !important;
+}
+
+.dark .text-slate-500,
+.dark .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+/* Input, option, selector backgrounds */
+.dark input,
+.dark select,
+.dark textarea,
+.dark .bg-slate-50 {
+  background-color: #111827 !important;
+  color: #f8fafc !important;
+  border-color: #374151 !important;
+}
+
+.dark input:focus,
+.dark select:focus {
+  border-color: #3b82f6 !important;
+}
+
+/* Specific elements background adjustments */
+.dark #welcome-dashboard-banner {
+  background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%) !important;
+  border-color: #1e40af !important;
+}
+
+.dark .divide-slate-100 > * {
+  border-color: #1e293b !important;
+}
+
+.dark .divide-slate-200 > * {
+  border-color: #1e293b !important;
+}
+
+.dark tr:hover {
+  background-color: #111827 !important;
+}
+
+.dark thead {
+  background-color: #090d16 !important;
+}
+
+.dark thead th {
+  color: #94a3b8 !important;
+  border-bottom: 2px solid #1e293b !important;
+}
+
+.dark .bg-slate-900 {
+  background-color: #0d1527 !important;
+}
+
+/* Let's style scrollbar for dark mode compatibility */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+}
+.dark ::-webkit-scrollbar-track {
+  background: #090d16;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  header, footer, #sandbox-identity-ribbon, button, select, input, .print\:hidden, #notification-bell-container {
+    display: none !important;
+  }
+}
+

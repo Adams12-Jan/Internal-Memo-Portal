@@ -1,0 +1,8 @@
+{
+  "name": "Vetiva Internal Memo Portal",
+  "description": "Admin Memo \u0026 Cash Advance Management Portal with multi-role workflows and retirement tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
