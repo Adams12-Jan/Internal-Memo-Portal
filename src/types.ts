@@ -45,6 +45,8 @@ export interface PaymentDetails {
   paymentReference: string;
   amountPaid: number;
   beneficiaryName: string;
+  proofOfPaymentName?: string;
+  proofOfPaymentUrl?: string;
 }
 
 export interface ExpenseItem {

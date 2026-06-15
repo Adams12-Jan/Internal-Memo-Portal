@@ -210,6 +210,7 @@ export default function App() {
     const paymentMethod = targetAdv?.paymentDetails?.paymentMethod || extraFields?.paymentMethod || "Bank Transfer";
     const paymentReference = targetAdv?.paymentDetails?.paymentReference || extraFields?.paymentReference || "TXN-902381283";
     const amountPaid = targetAdv?.paymentDetails?.amountPaid ? String(targetAdv.paymentDetails.amountPaid) : (extraFields?.amountPaid || amountRequested);
+    const proofOfPaymentName = targetAdv?.paymentDetails?.proofOfPaymentName || extraFields?.proofOfPaymentName || "No file uploaded";
 
     // Resolve retirement details if any
     const retirementId = extraFields?.retirementId || "RET-2026-001";
@@ -230,6 +231,7 @@ export default function App() {
       res = res.replace(/\{\{paymentMethod\}\}/g, paymentMethod);
       res = res.replace(/\{\{paymentReference\}\}/g, paymentReference);
       res = res.replace(/\{\{amountPaid\}\}/g, amountPaid);
+      res = res.replace(/\{\{proofOfPaymentName\}\}/g, proofOfPaymentName);
       res = res.replace(/\{\{appUrl\}\}/g, window.location.origin);
       res = res.replace(/\{\{actionUser\}\}/g, actionUser);
       res = res.replace(/\{\{actionRole\}\}/g, actionRole);
@@ -583,9 +585,13 @@ export default function App() {
       nextNotifs = [finNotif, ...nextNotifs];
     } else if (action === 'Pay') {
       // Mark as paid alerts Initiator, Head of Admin, and Internal Control
-      const infInitiator = triggerNotification(UserRole.ADMIN_OFFICER, `DISBURSED: Your request ${selectedRequestId} for ₦${targetReq.amountRequested} has been Paid by Finance details. Reference: ${paymentMeta?.paymentReference}`, selectedRequestId, 'status_change');
-      const infHOA = triggerNotification(UserRole.HEAD_OF_ADMIN, `DISBURSED: Request ${selectedRequestId} settled. Reference: ${paymentMeta?.paymentReference}`, selectedRequestId, 'status_change');
-      const infIC = triggerNotification(UserRole.INTERNAL_CONTROL, `DISBURSED: Request ${selectedRequestId} settled. Reference: ${paymentMeta?.paymentReference}`, selectedRequestId, 'status_change');
+      const proofLabel = paymentMeta?.proofOfPaymentName ? ` [Proof attached: ${paymentMeta.proofOfPaymentName}]` : '';
+      const adminProofLabel = paymentMeta?.proofOfPaymentName 
+        ? `, and dynamic proof of payment metadata (${paymentMeta.proofOfPaymentName}) has been filed to Admin desktop.` 
+        : '.';
+      const infInitiator = triggerNotification(UserRole.ADMIN_OFFICER, `DISBURSED: Your request ${selectedRequestId} for ₦${targetReq.amountRequested} has been Paid by Finance${proofLabel}. Reference: ${paymentMeta?.paymentReference}`, selectedRequestId, 'status_change');
+      const infHOA = triggerNotification(UserRole.HEAD_OF_ADMIN, `DISBURSED & REVIEW PROOF: Request ${selectedRequestId} settled${adminProofLabel} Reference: ${paymentMeta?.paymentReference}`, selectedRequestId, 'status_change');
+      const infIC = triggerNotification(UserRole.INTERNAL_CONTROL, `DISBURSED: Request ${selectedRequestId} settled${proofLabel}. Reference: ${paymentMeta?.paymentReference}`, selectedRequestId, 'status_change');
       nextNotifs = [infInitiator, infHOA, infIC, ...nextNotifs];
     }
 
@@ -600,7 +606,8 @@ export default function App() {
         {
           paymentMethod: paymentMeta?.paymentMethod,
           paymentReference: paymentMeta?.paymentReference,
-          amountPaid: String(paymentMeta?.amountPaid || targetReq.amountRequested)
+          amountPaid: String(paymentMeta?.amountPaid || targetReq.amountRequested),
+          proofOfPaymentName: paymentMeta?.proofOfPaymentName
         }
       );
     } else {
