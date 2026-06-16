@@ -522,7 +522,7 @@ export default function RetirementForm({
                       ref={canvasRef}
                       width={360}
                       height={100}
-                      className="w-full h-[100px] bg-white cursor-crosshair block"
+                      className="w-full h-[100px] bg-white cursor-pen block"
                       onMouseDown={startDrawing}
                       onMouseMove={draw}
                       onMouseUp={stopDrawing}

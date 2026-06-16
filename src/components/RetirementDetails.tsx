@@ -237,7 +237,7 @@ export default function RetirementDetails({
                 ref={canvasRef}
                 width={360}
                 height={120}
-                className="w-full h-[120px] bg-white cursor-crosshair block"
+                className="w-full h-[120px] bg-white cursor-pen block"
                 onMouseDown={startDrawing}
                 onMouseMove={draw}
                 onMouseUp={stopDrawing}
