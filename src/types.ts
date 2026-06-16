@@ -64,6 +64,7 @@ export interface ApprovalHistoryEntry {
   action: string;
   date: string;
   comment?: string;
+  signatureSvg?: string;
 }
 
 export interface CashAdvanceRequest {

@@ -95,11 +95,11 @@ export default function LoginPortal({ onLoginSuccess, staffList = STAFF_MEMBERS 
         {/* Left column (Visual Branding & Intro) */}
         <div className="md:col-span-5 bg-gradient-to-br from-blue-900/40 via-slate-950 to-slate-950 p-8 flex flex-col justify-between border-r border-slate-800">
           <div className="space-y-4">
-            <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center p-1 shadow-lg shadow-blue-900/40 border border-slate-800 overflow-hidden">
+            <div className="h-10 flex items-center justify-start shrink-0 overflow-hidden">
               <img 
-                src="https://imgur.com/QdEkdny.png" 
+                src="https://imgur.com/Om0LsC2.png" 
                 alt="Company Logo" 
-                className="w-full h-full object-contain animate-[spin_15s_linear_infinite] hover:animate-[spin_3s_linear_infinite] transition-all cursor-pointer"
+                className="h-full object-contain cursor-pointer"
                 referrerPolicy="no-referrer" 
               />
             </div>
@@ -127,14 +127,14 @@ export default function LoginPortal({ onLoginSuccess, staffList = STAFF_MEMBERS 
           </div>
         </div>
 
-        {/* Right column (Login Actions & Switchers) */}
+        {/* Right column (Single Sign-In Portal Form) */}
         <div className="md:col-span-7 p-8 bg-slate-950 flex flex-col justify-between">
           {pendingLoginIdx === null ? (
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-bold text-white tracking-tight">Identity Authentication</h2>
-                  <p className="text-xs text-slate-300 mt-1">Select an active corporate officer profile to simulate high-fidelity approval gates.</p>
+                  <h2 className="text-xl font-bold text-white tracking-tight">Enterprise Sign-In</h2>
+                  <p className="text-xs text-slate-400 mt-1">Access the secure Vetiva Memo portal via centralized dynamic authorization.</p>
                 </div>
                 
                 {/* Custom Toggle Switch for 2FA Authenticator */}
@@ -161,73 +161,74 @@ export default function LoginPortal({ onLoginSuccess, staffList = STAFF_MEMBERS 
                 </div>
               )}
 
-              {/* Quick Profiles grid (Interactive Cards) */}
-              <div className="space-y-3">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block font-mono">Simulated Employee Directory Roles</span>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
-                  {staffList.map((staff, idx) => {
-                    const emailName = staff.name.toLowerCase().replace(/\s+/g, '.');
-                    return (
-                      <button
-                        id={`login-role-card-${idx}`}
-                        key={staff.name}
-                        onClick={() => handleSelectLogin(idx)}
-                        type="button"
-                        className="text-left p-3 rounded-xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800 hover:border-blue-500/50 transition-all group flex items-start justify-between cursor-pointer"
-                      >
-                        <div className="min-w-0">
-                          <span className="text-xs font-bold text-white block group-hover:text-blue-400 transition-colors truncate">{staff.name}</span>
-                          <span className="text-[10px] text-blue-400 block mt-1 uppercase font-mono font-bold tracking-tight">{staff.role}</span>
-                          <span className="text-[9px] text-slate-400 block mt-0.5 truncate">{emailName}@corporate.com</span>
-                        </div>
-                        <Building className="w-3.5 h-3.5 text-slate-600 group-hover:text-blue-400/80 transition-colors shrink-0" />
-                      </button>
-                    );
-                  })}
+              {/* Single Sign-In Form */}
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSelectLogin(selectedIdx);
+                }} 
+                className="space-y-4 pt-1"
+              >
+                {/* User Identity Select */}
+                <div>
+                  <label htmlFor="user-select-dropdown" className="text-xs font-bold text-slate-300 uppercase tracking-widest block mb-2 font-mono">
+                    Authorized Corporate User Account
+                  </label>
+                  <div className="relative">
+                    <select
+                      id="user-select-dropdown"
+                      className="w-full bg-slate-900 border border-slate-800 focus:border-blue-500 rounded-xl p-3 text-slate-100 font-medium outline-none cursor-pointer text-xs"
+                      value={selectedIdx}
+                      onChange={(e) => {
+                        setSelectedIdx(Number(e.target.value));
+                        setError('');
+                      }}
+                    >
+                      {staffList.map((staff, idx) => (
+                        <option key={staff.name} value={idx}>
+                          {staff.name} — {staff.role} ({staff.department})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {/* Dynamic identity info card */}
+                  <div className="mt-2 text-[10px] text-slate-400 font-mono bg-slate-900/40 border border-slate-800/65 rounded-lg px-3 py-1.5 flex justify-between items-center">
+                    <span>Account Email:</span>
+                    <span className="text-blue-400 font-bold">
+                      {staffList[selectedIdx]?.name.toLowerCase().replace(/\s+/g, '.')}@corporate.com
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Manual Form entry */}
-              <form onSubmit={handleManualSubmit} className="space-y-3 pt-4 border-t border-slate-800">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block font-mono">Or Manual Credentials (Self-Registration)</span>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
-                      <input
-                        id="login-input-email"
-                        type="text"
-                        placeholder="e.g. robert.finch@corporate.com"
-                        className="w-full bg-slate-900/60 border border-slate-800 rounded-lg p-2.5 pl-9 text-slate-200 outline-none focus:border-blue-500 font-medium font-sans"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                    </div>
+                {/* Password / Pin field */}
+                <div>
+                  <label htmlFor="login-input-password" className="text-xs font-bold text-slate-300 uppercase tracking-widest block mb-2 font-mono">
+                    Security Passcode / PIN
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3.5 w-4 h-4 text-slate-500" />
+                    <input
+                      id="login-input-password"
+                      type="password"
+                      placeholder="••••••••"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 pl-10 text-slate-250 outline-none focus:border-blue-500 text-xs font-mono"
+                      value="12345678"
+                      disabled
+                    />
                   </div>
-
-                  <div>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
-                      <input
-                        id="login-input-password"
-                        type="password"
-                        placeholder="••••••••"
-                        className="w-full bg-slate-900/60 border border-slate-800 rounded-lg p-2.5 pl-9 text-slate-200 outline-none focus:border-blue-500"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                      />
-                    </div>
-                  </div>
+                  <span className="text-[9px] text-slate-500 mt-1 block">
+                    Enterprise passcodes and digital tokens are securely generated for sandbox simulation.
+                  </span>
                 </div>
 
                 <button
                   id="login-submit-btn"
                   type="submit"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-xs transition-all shadow-md shadow-blue-900/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl text-xs transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-1.5 cursor-pointer mt-4"
                 >
-                  <Sparkles className="w-4 h-4 animate-pulse text-amber-300" /> Authorized Login Profile
+                  <Sparkles className="w-4 h-4 animate-pulse text-amber-350" />
+                  Establish Secure Session as {staffList[selectedIdx]?.name}
                 </button>
               </form>
             </div>
@@ -244,7 +245,7 @@ export default function LoginPortal({ onLoginSuccess, staffList = STAFF_MEMBERS 
                 }}
                 className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer"
               >
-                <ArrowLeft className="w-4 h-4" /> Go Back to Corporate List
+                <ArrowLeft className="w-4 h-4" /> Return to Central Sign-In
               </button>
 
               <div>
@@ -281,7 +282,7 @@ export default function LoginPortal({ onLoginSuccess, staffList = STAFF_MEMBERS 
                   <div>
                     <h3 className="text-xs font-bold text-slate-200">Vetiva Authenticator</h3>
                     <p className="text-[10px] text-slate-400 font-mono">
-                      {staffList[pendingLoginIdx].name.toLowerCase().replace(/\s+/g, '.')}@corporate.com
+                      {staffList[pendingLoginIdx]?.name.toLowerCase().replace(/\s+/g, '.')}@corporate.com
                     </p>
                   </div>
                 </div>
@@ -361,7 +362,7 @@ export default function LoginPortal({ onLoginSuccess, staffList = STAFF_MEMBERS 
                       const cleanInput = mfaInput.replace(/\s+/g, '');
                       const cleanCode = mfaCode.replace(/\s+/g, '');
                       if (cleanInput === cleanCode) {
-                        onLoginSuccess(pendingLoginIdx);
+                        onLoginSuccess(pendingLoginIdx!);
                       } else {
                         setMfaError('The security passcode does not match. Please enter the current code active on your auth device.');
                       }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   ArrowLeft, CheckCircle, XCircle, HelpCircle, FileText, Send, 
   MessageSquare, Calendar, DollarSign, ShieldAlert, BadgeAlert,
@@ -16,7 +16,8 @@ interface RequestDetailsProps {
     action: 'Approve' | 'Reject' | 'Request Clarification' | 'Send to Finance' | 'Pay' | 'Return to Admin' | 'Return for Review' | 'Resubmit',
     comment: string,
     paymentMeta?: PaymentDetails,
-    updatedFields?: Partial<CashAdvanceRequest>
+    updatedFields?: Partial<CashAdvanceRequest>,
+    signatureSvg?: string
   ) => void;
 }
 
@@ -50,6 +51,83 @@ export default function RequestDetails({
   const [proofOfPaymentUrl, setProofOfPaymentUrl] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
 
+  // E-Signature state manager
+  const [signatureMode, setSignatureMode] = useState<'typed' | 'drawn'>('typed');
+  const [typedSignature, setTypedSignature] = useState(currentUserName);
+  const [drawnSignature, setDrawnSignature] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+
+  useEffect(() => {
+    setTypedSignature(currentUserName);
+  }, [currentUserName]);
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.strokeStyle = '#2563eb'; // blue-600 color
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const rect = canvas.getBoundingClientRect();
+    let x, y;
+    if ('touches' in e) {
+      if (e.touches.length === 0) return;
+      x = e.touches[0].clientX - rect.left;
+      y = e.touches[0].clientY - rect.top;
+    } else {
+      x = e.clientX - rect.left;
+      y = e.clientY - rect.top;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    setIsDrawing(true);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    let x, y;
+    if ('touches' in e) {
+      if (e.touches.length === 0) return;
+      x = e.touches[0].clientX - rect.left;
+      y = e.touches[0].clientY - rect.top;
+    } else {
+      x = e.clientX - rect.left;
+      y = e.clientY - rect.top;
+    }
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      setDrawnSignature(canvas.toDataURL());
+    }
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setDrawnSignature(null);
+  };
+
   // Determine current active workflow step for visual stepper
   const getActiveStepIndex = () => {
     switch (request.currentStatus) {
@@ -75,8 +153,15 @@ export default function RequestDetails({
       return;
     }
     setErrorMsg('');
-    onApprovalAction(action, comment);
+    
+    // Core dynamic signature injection
+    const finalSignature = (action === 'Approve' || action === 'Send to Finance')
+      ? (signatureMode === 'typed' ? `typed:${typedSignature}` : (drawnSignature ? `drawn:${drawnSignature}` : `typed:${currentUserName}`))
+      : undefined;
+
+    onApprovalAction(action, comment, undefined, undefined, finalSignature);
     setComment('');
+    setDrawnSignature(null); // Reset after action completes successfully
   };
 
   const handlePayAction = (e: React.FormEvent) => {
@@ -101,6 +186,10 @@ export default function RequestDetails({
     const finalProofName = proofOfPaymentName.trim() || `VETIVA_DISBURSEMENT_SLIP_${paymentReference.replace(/\s+/g, '_') || 'TXN'}.pdf`;
     const finalProofUrl = proofOfPaymentUrl || 'https://imgur.com/1RyshXT.png';
 
+    const finalSignature = signatureMode === 'typed' 
+      ? `typed:${typedSignature}` 
+      : (drawnSignature ? `drawn:${drawnSignature}` : `typed:${currentUserName}`);
+
     onApprovalAction('Pay', comment || 'Disbursed', {
       paymentDate,
       paymentMethod,
@@ -109,8 +198,9 @@ export default function RequestDetails({
       beneficiaryName,
       proofOfPaymentName: finalProofName,
       proofOfPaymentUrl: finalProofUrl
-    });
+    }, undefined, finalSignature);
     setComment('');
+    setDrawnSignature(null);
   };
 
   const handleResubmit = (e: React.FormEvent) => {
@@ -163,6 +253,91 @@ export default function RequestDetails({
       setPrintSuccess(false);
       window.print();
     }, 1200);
+  };
+
+  const renderESignaturePad = () => {
+    return (
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3">
+        <div className="flex items-center justify-between border-b border-slate-200/65 pb-2 mb-2">
+          <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+            ✍️ Electronic Approval Signature
+          </label>
+          <div className="flex bg-slate-200/60 p-0.5 rounded-lg text-[10px] font-bold">
+            <button
+              type="button"
+              onClick={() => setSignatureMode('typed')}
+              className={`px-2.5 py-1 rounded-md transition-all ${signatureMode === 'typed' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+            >
+              Type Name
+            </button>
+            <button
+              type="button"
+              onClick={() => setSignatureMode('drawn')}
+              className={`px-2.5 py-1 rounded-md transition-all ${signatureMode === 'drawn' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+            >
+              Draw Freehand
+            </button>
+          </div>
+        </div>
+
+        {signatureMode === 'typed' ? (
+          <div className="space-y-1.5">
+            <p className="text-[9px] text-slate-400 leading-normal">
+              A dynamic cursive typeface will represent your official signature. You can customize the spelling:
+            </p>
+            <input
+              type="text"
+              className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500 font-sans tracking-wide font-medium"
+              value={typedSignature}
+              onChange={(e) => setTypedSignature(e.target.value)}
+              placeholder="Type signature name..."
+            />
+            <div className="bg-amber-50/20 border border-amber-200/30 rounded-lg p-3 flex items-center justify-center min-h-[60px] select-none">
+              <span className="font-serif italic text-2xl text-blue-700 tracking-widest font-bold">
+                {typedSignature || currentUserName}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <p className="text-[9px] text-slate-400 leading-normal">
+              Draw your signature inside the sandbox canvas. Use your mouse pointer or touch responsive screens:
+            </p>
+            <div className="relative border border-slate-200 rounded-lg bg-white overflow-hidden">
+              <canvas
+                ref={canvasRef}
+                width={360}
+                height={120}
+                className="w-full h-[120px] bg-white cursor-crosshair block"
+                onMouseDown={startDrawing}
+                onMouseMove={draw}
+                onMouseUp={stopDrawing}
+                onMouseLeave={stopDrawing}
+                onTouchStart={startDrawing}
+                onTouchMove={draw}
+                onTouchEnd={stopDrawing}
+              />
+              <button
+                type="button"
+                onClick={clearCanvas}
+                className="absolute right-2 bottom-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-2 py-1 rounded text-[10px] uppercase tracking-wider transition-colors"
+              >
+                Clear Pad
+              </button>
+            </div>
+            {drawnSignature ? (
+              <div className="text-[9px] text-emerald-600 font-bold flex items-center gap-1 mt-1 justify-end">
+                <span>✓ Active draft captured successfully</span>
+              </div>
+            ) : (
+              <div className="text-[9px] text-slate-400 flex items-center gap-1 mt-1 justify-end">
+                <span>⏳ Draw on canvas pad to populate binary stream</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const stepperSteps = [
@@ -483,6 +658,21 @@ export default function RequestDetails({
                           {item.comment}
                         </p>
                       )}
+                      {item.signatureSvg && (
+                        <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-slate-500 select-none">
+                          <span className="font-mono text-[8px] uppercase tracking-wider text-slate-400">Auth Signature:</span>
+                          {item.signatureSvg.startsWith('drawn:') ? (
+                            <img src={item.signatureSvg.substring(6)} className="h-7 max-h-9 max-w-[140px] object-contain border-b border-dashed border-blue-300 bg-blue-50/20 px-1.5 py-0.5 rounded" alt="Signature" referrerPolicy="no-referrer" />
+                          ) : (
+                            <span className="font-serif italic text-xs text-blue-600 border-b border-dashed border-blue-300 font-bold px-2 py-0.5 bg-blue-50/20 rounded tracking-widest">
+                              {item.signatureSvg.substring(6)}
+                            </span>
+                          )}
+                          <span className="text-[8px] text-emerald-700 font-extrabold bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-900/35 flex items-center gap-0.5 shrink-0">
+                            🔒 SECURED DIGITAL V-STAMP
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))
@@ -630,6 +820,8 @@ export default function RequestDetails({
                     />
                   </div>
 
+                  {renderESignaturePad()}
+
                   <div className="grid grid-cols-1 gap-2">
                     <button
                       id="approve-action-btn"
@@ -698,6 +890,8 @@ export default function RequestDetails({
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                   />
+
+                  {renderESignaturePad()}
 
                   <div className="grid grid-cols-1 gap-2">
                     <button
@@ -912,6 +1106,8 @@ export default function RequestDetails({
                       />
                     </div>
                   </div>
+
+                  {renderESignaturePad()}
 
                   <div className="grid grid-cols-1 gap-2 pt-2">
                     <button

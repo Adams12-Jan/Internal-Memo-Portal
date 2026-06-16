@@ -64,7 +64,7 @@ export default function App() {
   const [staffMembers, setStaffMembers] = useState<{ name: string; role: UserRole; department: string }[]>([]);
 
   // Simulation controls
-  const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem('ca_session_logged_in') === 'true');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeUserIdx, setActiveUserIdx] = useState(() => parseInt(localStorage.getItem('ca_session_user_idx') || '0'));
   
   const currentUser = staffMembers[activeUserIdx] || staffMembers[0] || { name: 'John Doe', role: UserRole.ADMIN_OFFICER, department: 'Administration' };
@@ -452,7 +452,8 @@ export default function App() {
     action: 'Approve' | 'Reject' | 'Request Clarification' | 'Send to Finance' | 'Pay' | 'Return to Admin' | 'Return for Review' | 'Resubmit',
     commentText: string,
     paymentMeta?: PaymentDetails,
-    updatedFields?: Partial<CashAdvanceRequest>
+    updatedFields?: Partial<CashAdvanceRequest>,
+    signatureSvg?: string
   ) => {
     if (!selectedRequestId) return;
     const timestamp = getTimestampString();
@@ -511,7 +512,8 @@ export default function App() {
         userName: currentUser.name,
         action: action as any,
         date: timestamp,
-        comment: commentText || `${action} verified`
+        comment: commentText || `${action} verified`,
+        signatureSvg: signatureSvg
       });
 
       const updatedRequest: CashAdvanceRequest = {
@@ -696,7 +698,8 @@ export default function App() {
   // 4. RETIREMENT Verification Actions flow
   const handleVerificationAction = (
     action: 'Approve' | 'Reject' | 'Request Clarification' | 'Send to Finance' | 'Return to Admin' | 'Return for Review' | 'Resubmit',
-    commentText: string
+    commentText: string,
+    signatureSvg?: string
   ) => {
     if (!selectedRetirementId) return;
     const timestamp = getTimestampString();
@@ -733,7 +736,8 @@ export default function App() {
         userName: currentUser.name,
         action: `${action} (Verify)` as any,
         date: timestamp,
-        comment: commentText
+        comment: commentText,
+        signatureSvg: signatureSvg
       });
 
       return {
@@ -1058,8 +1062,8 @@ export default function App() {
           {/* Logo Portion */}
           <div className="p-6 border-b border-slate-800">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 p-1 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-center shrink-0">
-                <img src="https://imgur.com/QdEkdny.png" alt="Company Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+              <div className="h-8 flex items-center justify-center shrink-0">
+                <img src="https://imgur.com/Om0LsC2.png" alt="Company Logo" className="h-full object-contain" referrerPolicy="no-referrer" />
               </div>
               <div className="min-w-0">
                 <h1 className="font-extrabold text-slate-100 text-sm tracking-tight leading-none uppercase truncate">Vetiva Memo</h1>
@@ -1199,8 +1203,8 @@ export default function App() {
               </button>
               
               <div className="lg:hidden flex items-center gap-2">
-                <div className="w-8 h-8 p-1 bg-slate-900 rounded-lg flex items-center justify-center shrink-0 border border-slate-200">
-                  <img src="https://imgur.com/QdEkdny.png" alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                <div className="h-7 flex items-center justify-center shrink-0">
+                  <img src="https://imgur.com/Om0LsC2.png" alt="Logo" className="h-full object-contain" referrerPolicy="no-referrer" />
                 </div>
                 <h1 className="font-bold text-slate-800 text-xs tracking-tight uppercase leading-none truncate">Vetiva Memo</h1>
               </div>

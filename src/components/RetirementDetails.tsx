@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   ArrowLeft, CheckCircle, XCircle, Info, FileText, Calendar, 
   DollarSign, ShieldAlert, User, Check, AlertCircle, Clock, 
@@ -13,7 +13,8 @@ interface RetirementDetailsProps {
   onBack: () => void;
   onVerifyAction: (
     action: 'Approve' | 'Reject' | 'Request Clarification' | 'Send to Finance' | 'Return to Admin' | 'Return for Review' | 'Resubmit',
-    comment: string
+    comment: string,
+    signatureSvg?: string
   ) => void;
 }
 
@@ -27,6 +28,83 @@ export default function RetirementDetails({
   const [comment, setComment] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [printSuccess, setPrintSuccess] = useState(false);
+
+  // E-Signature state manager
+  const [signatureMode, setSignatureMode] = useState<'typed' | 'drawn'>('typed');
+  const [typedSignature, setTypedSignature] = useState(currentUserName);
+  const [drawnSignature, setDrawnSignature] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+
+  useEffect(() => {
+    setTypedSignature(currentUserName);
+  }, [currentUserName]);
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.strokeStyle = '#2563eb'; // blue-600 color
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const rect = canvas.getBoundingClientRect();
+    let x, y;
+    if ('touches' in e) {
+      if (e.touches.length === 0) return;
+      x = e.touches[0].clientX - rect.left;
+      y = e.touches[0].clientY - rect.top;
+    } else {
+      x = e.clientX - rect.left;
+      y = e.clientY - rect.top;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    setIsDrawing(true);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    let x, y;
+    if ('touches' in e) {
+      if (e.touches.length === 0) return;
+      x = e.touches[0].clientX - rect.left;
+      y = e.touches[0].clientY - rect.top;
+    } else {
+      x = e.clientX - rect.left;
+      y = e.clientY - rect.top;
+    }
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      setDrawnSignature(canvas.toDataURL());
+    }
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setDrawnSignature(null);
+  };
 
   // Checks for role verification capability
   const isAuthorizedToVerify = () => {
@@ -78,8 +156,100 @@ export default function RetirementDetails({
       return;
     }
     setErrorMsg('');
-    onVerifyAction(action, comment);
+
+    // Compute signature data for approvals
+    const finalSignature = (action === 'Approve' || action === 'Send to Finance')
+      ? (signatureMode === 'typed' ? `typed:${typedSignature}` : (drawnSignature ? `drawn:${drawnSignature}` : `typed:${currentUserName}`))
+      : undefined;
+
+    onVerifyAction(action, comment, finalSignature);
     setComment('');
+    setDrawnSignature(null);
+  };
+
+  const renderESignaturePad = () => {
+    return (
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3">
+        <div className="flex items-center justify-between border-b border-slate-200/65 pb-2 mb-2">
+          <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+            ✍️ Electronic Verification Signature
+          </label>
+          <div className="flex bg-slate-200/60 p-0.5 rounded-lg text-[10px] font-bold">
+            <button
+              type="button"
+              onClick={() => setSignatureMode('typed')}
+              className={`px-2.5 py-1 rounded-md transition-all ${signatureMode === 'typed' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+            >
+              Type Name
+            </button>
+            <button
+              type="button"
+              onClick={() => setSignatureMode('drawn')}
+              className={`px-2.5 py-1 rounded-md transition-all ${signatureMode === 'drawn' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+            >
+              Draw Freehand
+            </button>
+          </div>
+        </div>
+
+        {signatureMode === 'typed' ? (
+          <div className="space-y-1.5">
+            <p className="text-[9px] text-slate-400 leading-normal">
+              A dynamic cursive typeface will represent your official signature. You can customize the spelling:
+            </p>
+            <input
+              type="text"
+              className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500 font-sans tracking-wide font-medium"
+              value={typedSignature}
+              onChange={(e) => setTypedSignature(e.target.value)}
+              placeholder="Type signature name..."
+            />
+            <div className="bg-amber-50/20 border border-amber-200/30 rounded-lg p-3 flex items-center justify-center min-h-[60px] select-none">
+              <span className="font-serif italic text-2xl text-blue-700 tracking-widest font-bold">
+                {typedSignature || currentUserName}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <p className="text-[9px] text-slate-400 leading-normal">
+              Draw your signature inside the sandbox canvas. Use your mouse pointer or touch responsive screens:
+            </p>
+            <div className="relative border border-slate-200 rounded-lg bg-white overflow-hidden">
+              <canvas
+                ref={canvasRef}
+                width={360}
+                height={120}
+                className="w-full h-[120px] bg-white cursor-crosshair block"
+                onMouseDown={startDrawing}
+                onMouseMove={draw}
+                onMouseUp={stopDrawing}
+                onMouseLeave={stopDrawing}
+                onTouchStart={startDrawing}
+                onTouchMove={draw}
+                onTouchEnd={stopDrawing}
+              />
+              <button
+                type="button"
+                onClick={clearCanvas}
+                className="absolute right-2 bottom-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-2 py-1 rounded text-[10px] uppercase tracking-wider transition-colors"
+              >
+                Clear Pad
+              </button>
+            </div>
+            {drawnSignature ? (
+              <div className="text-[9px] text-emerald-600 font-bold flex items-center gap-1 mt-1 justify-end">
+                <span>✓ Active draft captured successfully</span>
+              </div>
+            ) : (
+              <div className="text-[9px] text-slate-400 flex items-center gap-1 mt-1 justify-end">
+                <span>⏳ Draw on canvas pad to populate binary stream</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const stepperSteps = [
@@ -280,6 +450,20 @@ export default function RetirementDetails({
                         {item.comment}
                       </p>
                     )}
+                    {item.signatureSvg && (
+                      <div className="mt-1 flex items-center gap-1 select-none">
+                        {item.signatureSvg.startsWith('drawn:') ? (
+                          <img src={item.signatureSvg.substring(6)} className="h-6 max-h-8 max-w-[110px] object-contain border-b border-dashed border-blue-300 bg-blue-50/10 px-1 py-0.2 rounded" alt="Signature" referrerPolicy="no-referrer" />
+                        ) : (
+                          <span className="font-serif italic text-[11px] text-blue-600 border-b border-dashed border-blue-300 font-bold px-1.5 py-0.2 bg-blue-50/10 rounded tracking-wider">
+                            {item.signatureSvg.substring(6)}
+                          </span>
+                        )}
+                        <span className="text-[7px] text-emerald-700 font-extrabold bg-emerald-50 dark:bg-emerald-950/20 px-1 py-0.2 rounded border border-emerald-100 dark:border-emerald-900/40 shrink-0">
+                          🔒 DIGITAL STAMP
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -345,6 +529,8 @@ export default function RetirementDetails({
                   onChange={(e) => setComment(e.target.value)}
                 />
               </div>
+
+              {renderESignaturePad()}
 
               <div className="grid grid-cols-1 gap-2">
                 {/* primary action */}
