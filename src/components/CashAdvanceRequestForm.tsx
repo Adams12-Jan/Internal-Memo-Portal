@@ -10,13 +10,15 @@ interface CashAdvanceRequestFormProps {
   onCancel: () => void;
   nextReferenceNumber: string;
   currentUser: { name: string; department: string };
+  maxAmount?: number;
 }
 
 export default function CashAdvanceRequestForm({
   onAddRequest,
   onCancel,
   nextReferenceNumber,
-  currentUser
+  currentUser,
+  maxAmount = 2000000
 }: CashAdvanceRequestFormProps) {
   const [staffName, setStaffName] = useState(currentUser.name);
   const [department, setDepartment] = useState(currentUser.department);
@@ -173,6 +175,8 @@ export default function CashAdvanceRequestForm({
     const amt = parseFloat(amountRequested);
     if (isNaN(amt) || amt <= 0) {
       tempErrors.amountRequested = 'Please specify a positive valid amount';
+    } else if (amt > maxAmount) {
+      tempErrors.amountRequested = `Requested amount exceeds the maximum allowance of ₦${maxAmount.toLocaleString()} configured in CMS settings.`;
     }
     if (!expectedRetirementDate) {
       tempErrors.expectedRetirementDate = 'Expected retirement date must be defined';

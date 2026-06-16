@@ -164,3 +164,16 @@ export interface SentEmail {
   referenceNumber: string;
 }
 
+export interface SystemCustomSettings {
+  maxCashAdvance: number;
+  retirementWindowDays: number;
+  requiresExecutiveApprovalAbove: number;
+  customLogoText: string;
+  themeAccent: 'default' | 'blue' | 'purple' | 'emerald' | 'crimson' | 'orange';
+  borderStyle: 'default' | 'rounded' | 'sharp';
+  supportEmail: string;
+  supportPhone: string;
+  debugBarEnabled: boolean;
+}
+
+

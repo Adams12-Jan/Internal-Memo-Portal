@@ -4,7 +4,8 @@ import {
   Users, Trash2, Clock, CheckCircle2, UserPlus, FileCode, Check, 
   ChevronRight, Laptop, Smartphone, HelpCircle, ShieldAlert 
 } from 'lucide-react';
-import { EmailTemplate, SentEmail, UserRole, DEPARTMENTS } from '../types';
+import { EmailTemplate, SentEmail, UserRole, DEPARTMENTS, SystemCustomSettings } from '../types';
+import { Palette, Wrench, ShieldCheck } from 'lucide-react';
 
 interface CrmPortalProps {
   templates: EmailTemplate[];
@@ -18,6 +19,10 @@ interface CrmPortalProps {
   onResetFactoryDefault: () => void;
   advances: any[];
   retirements: any[];
+  systemSettings: SystemCustomSettings;
+  onSaveSystemSettings: (nextSettings: SystemCustomSettings) => void;
+  onPurgeAdvances: () => void;
+  onPurgeRetirements: () => void;
 }
 
 export default function CrmPortal({
@@ -31,10 +36,14 @@ export default function CrmPortal({
   onSimulateReminders,
   onResetFactoryDefault,
   advances,
-  retirements
+  retirements,
+  systemSettings,
+  onSaveSystemSettings,
+  onPurgeAdvances,
+  onPurgeRetirements
 }: CrmPortalProps) {
-  // Sub-tabs: templates, sentLog, directory, utilities
-  const [subTab, setSubTab] = useState<'templates' | 'sentLog' | 'directory' | 'utilities'>('templates');
+  // Sub-tabs: templates, sentLog, directory, utilities, settings
+  const [subTab, setSubTab] = useState<'templates' | 'sentLog' | 'directory' | 'utilities' | 'settings'>('templates');
   
   // 1. Template States
   const [selectedTemplateId, setSelectedTemplateId] = useState(templates[0]?.id || '');
@@ -52,6 +61,30 @@ export default function CrmPortal({
   const [editStaffName, setEditStaffName] = useState('');
   const [editStaffRole, setEditStaffRole] = useState<UserRole>(UserRole.ADMIN_OFFICER);
   const [editStaffDept, setEditStaffDept] = useState('Administration');
+
+  // 3. System settings CMS states
+  const [cmsLogoText, setCmsLogoText] = useState(systemSettings.customLogoText);
+  const [cmsMaxAdvance, setCmsMaxAdvance] = useState(systemSettings.maxCashAdvance);
+  const [cmsRetireDays, setCmsRetireDays] = useState(systemSettings.retirementWindowDays);
+  const [cmsExecThreshold, setCmsExecThreshold] = useState(systemSettings.requiresExecutiveApprovalAbove);
+  const [cmsAccent, setCmsAccent] = useState(systemSettings.themeAccent);
+  const [cmsBorder, setCmsBorder] = useState(systemSettings.borderStyle);
+  const [cmsSupportEmail, setCmsSupportEmail] = useState(systemSettings.supportEmail);
+  const [cmsSupportPhone, setCmsSupportPhone] = useState(systemSettings.supportPhone);
+  const [cmsDebugEnabled, setCmsDebugEnabled] = useState(systemSettings.debugBarEnabled);
+  const [saveSettingsSuccess, setSaveSettingsSuccess] = useState(false);
+
+  useEffect(() => {
+    setCmsLogoText(systemSettings.customLogoText);
+    setCmsMaxAdvance(systemSettings.maxCashAdvance);
+    setCmsRetireDays(systemSettings.retirementWindowDays);
+    setCmsExecThreshold(systemSettings.requiresExecutiveApprovalAbove);
+    setCmsAccent(systemSettings.themeAccent);
+    setCmsBorder(systemSettings.borderStyle);
+    setCmsSupportEmail(systemSettings.supportEmail);
+    setCmsSupportPhone(systemSettings.supportPhone);
+    setCmsDebugEnabled(systemSettings.debugBarEnabled);
+  }, [systemSettings]);
 
   // Trigger preview compile when template selection changes
   useEffect(() => {
@@ -256,6 +289,13 @@ export default function CrmPortal({
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${subTab === 'utilities' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
           >
             System Scheduler
+          </button>
+          <button 
+            id="subtab-settings"
+            onClick={() => setSubTab('settings')}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${subTab === 'settings' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+          >
+            ⚙️ IT CMS Settings
           </button>
         </div>
       </div>
@@ -730,6 +770,320 @@ export default function CrmPortal({
               Wipe cache & Hard Reset Database
             </button>
           </div>
+        </div>
+      )}
+
+      {/* SUB-TAB 5: IT DEPT GLOBAL CMS & THEMES SETTINGS */}
+      {subTab === 'settings' && (
+        <div className="max-w-4xl mx-auto space-y-6 animate-fade-in text-left">
+          
+          <div className="bg-slate-900 border border-slate-800 text-white p-5 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-3 shadow-md shadow-indigo-900/15">
+            <div>
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5.5 h-5.5 text-blue-400" />
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest font-mono select-none">Secure IT Admin Access Active</span>
+              </div>
+              <h3 className="text-base font-bold text-slate-100 mt-1 font-sans">IT & System Control Center</h3>
+              <p className="text-xs text-slate-400">Configure real-time server policy definitions, dynamic theme sets, custom header title and database locks.</p>
+            </div>
+            
+            <button
+              type="button"
+              id="cms-save-settings-btn-main"
+              onClick={() => {
+                onSaveSystemSettings({
+                  maxCashAdvance: Number(cmsMaxAdvance) || 2000000,
+                  retirementWindowDays: Number(cmsRetireDays) || 14,
+                  requiresExecutiveApprovalAbove: Number(cmsExecThreshold) || 1000000,
+                  customLogoText: cmsLogoText,
+                  themeAccent: cmsAccent,
+                  borderStyle: cmsBorder,
+                  supportEmail: cmsSupportEmail,
+                  supportPhone: cmsSupportPhone,
+                  debugBarEnabled: cmsDebugEnabled
+                });
+                setSaveSettingsSuccess(true);
+                setTimeout(() => setSaveSettingsSuccess(false), 3000);
+              }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white hover:text-white rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-1"
+            >
+              <Save className="w-3.5 h-3.5" /> Save CMS System Settings
+            </button>
+          </div>
+
+          {saveSettingsSuccess && (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-center text-xs font-bold animate-bounce shadow-xs">
+              ✓ IT System changes saved successfully & applied dynamically across the memo portal interface!
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8">
+            
+            {/* Box 1: Theme & Interface Styling (CMS custom themes) */}
+            <div className="bg-white border border-slate-200 p-5 rounded-xl space-y-4 shadow-xs">
+              <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-2">
+                <Palette className="w-4 h-4 text-blue-500" /> 1. Dynamic Portal Themes
+              </h4>
+              
+              {/* Theme Selector */}
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block font-mono">Theme Color Brand Palette Accent</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCmsAccent('default')}
+                    className={`p-2 rounded-lg border text-xs font-bold text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                      cmsAccent === 'default' ? 'bg-slate-50 border-blue-600 text-blue-700 ring-2 ring-blue-500/20' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="w-5 h-5 rounded-full bg-[#9F9055] inline-block shadow-inner" />
+                    <span className="text-[10px] mt-1 font-bold">Vetiva Gold</span>
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setCmsAccent('blue')}
+                    className={`p-2 rounded-lg border text-xs font-bold text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                      cmsAccent === 'blue' ? 'bg-slate-50 border-blue-600 text-blue-700 ring-2 ring-blue-500/20' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="w-5 h-5 rounded-full bg-[#2563EB] inline-block shadow-inner" />
+                    <span className="text-[10px] mt-1 font-bold">Ocean Blue</span>
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setCmsAccent('purple')}
+                    className={`p-2 rounded-lg border text-xs font-bold text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                      cmsAccent === 'purple' ? 'bg-slate-50 border-blue-600 text-blue-700 ring-2 ring-blue-500/20' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="w-5 h-5 rounded-full bg-[#8B5CF6] inline-block shadow-inner" />
+                    <span className="text-[10px] mt-1 font-bold">Velvet Purple</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCmsAccent('emerald')}
+                    className={`p-2 rounded-lg border text-xs font-bold text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                      cmsAccent === 'emerald' ? 'bg-slate-50 border-blue-600 text-blue-700 ring-2 ring-blue-500/20' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="w-5 h-5 rounded-full bg-[#10B981] inline-block shadow-inner" />
+                    <span className="text-[10px] mt-1 font-bold">Emerald Green</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCmsAccent('crimson')}
+                    className={`p-2 rounded-lg border text-xs font-bold text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                      cmsAccent === 'crimson' ? 'bg-slate-50 border-blue-600 text-blue-700 ring-2 ring-blue-500/20' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="w-5 h-5 rounded-full bg-[#EF4444] inline-block shadow-inner" />
+                    <span className="text-[10px] mt-1 font-bold">Venetian Red</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCmsAccent('orange')}
+                    className={`p-2 rounded-lg border text-xs font-bold text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                      cmsAccent === 'orange' ? 'bg-slate-50 border-blue-600 text-blue-700 ring-2 ring-blue-500/20' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="w-5 h-5 rounded-full bg-[#F97316] inline-block shadow-inner" />
+                    <span className="text-[10px] mt-1 font-bold">Tech Orange</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Border radius selector */}
+              <div className="space-y-2 pt-2">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block font-mono">Corner Border Roundness Style</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCmsBorder('default')}
+                    className={`p-2 bg-white rounded-lg border border-slate-200 text-xs font-bold text-center transition-all cursor-pointer ${
+                      cmsBorder === 'default' ? 'border-blue-600 text-blue-700 font-extrabold ring-1 ring-blue-500/20 bg-slate-50/50' : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    Standard Round
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCmsBorder('rounded')}
+                    className={`p-2 bg-white rounded-2xl border border-slate-200 text-xs font-bold text-center transition-all cursor-pointer ${
+                      cmsBorder === 'rounded' ? 'border-blue-600 text-blue-700 font-extrabold ring-1 ring-blue-500/20 bg-slate-50/50' : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    Fluid Round (HD)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCmsBorder('sharp')}
+                    className={`p-2 bg-white rounded-none border border-slate-200 text-xs font-bold text-center transition-all cursor-pointer ${
+                      cmsBorder === 'sharp' ? 'border-blue-600 text-blue-700 font-extrabold ring-1 ring-blue-500/20 bg-slate-50/50' : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    Brutalist Sharp
+                  </button>
+                </div>
+              </div>
+
+              {/* Custom Logo Title */}
+              <div className="space-y-1.5 pt-2">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block font-mono">Company App Header Name</label>
+                <input
+                  type="text"
+                  value={cmsLogoText}
+                  onChange={(e) => setCmsLogoText(e.target.value)}
+                  placeholder="e.g. Memo Portal"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-semibold"
+                />
+                <p className="text-[9px] text-slate-400 font-medium">Updates header title and system branding dynamically.</p>
+              </div>
+
+            </div>
+
+            {/* Box 2: Financial Policy Configurations (CMS Control) */}
+            <div className="bg-white border border-slate-200 p-5 rounded-xl space-y-4 shadow-xs">
+              <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-2">
+                <Wrench className="w-4 h-4 text-blue-500" /> 2. Cash Advance Fiscal Rules
+              </h4>
+
+              {/* Limit value */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block font-mono">Maximum Single Request Limit (₦)</label>
+                <input
+                  type="number"
+                  value={cmsMaxAdvance}
+                  onChange={(e) => setCmsMaxAdvance(Number(e.target.value))}
+                  placeholder="2000000"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-semibold"
+                />
+                <p className="text-[9px] text-slate-400 font-medium">Any request exceeding this constraint will fail validation checks instantly.</p>
+              </div>
+
+              {/* Retirement Window Days */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block font-mono">Mandatory Retirement Window (Days)</label>
+                <input
+                  type="number"
+                  value={cmsRetireDays}
+                  onChange={(e) => setCmsRetireDays(Number(e.target.value))}
+                  placeholder="14"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-semibold"
+                />
+                <p className="text-[9px] text-slate-400 font-medium">Required timeline before a Cash Advance is flagged as delinquent.</p>
+              </div>
+
+              {/* Exec audit Threshold */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block font-mono">Executive Audit Threshold Trigger (₦)</label>
+                <input
+                  type="number"
+                  value={cmsExecThreshold}
+                  onChange={(e) => setCmsExecThreshold(Number(e.target.value))}
+                  placeholder="1000000"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-semibold"
+                />
+                <p className="text-[9px] text-slate-400 font-medium">Amounts above this value automatically route to the Executive Office for final screening.</p>
+              </div>
+
+            </div>
+
+            {/* Box 3: IT Support Details */}
+            <div className="bg-white border border-slate-200 p-5 rounded-xl space-y-4 shadow-xs">
+              <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-2">
+                <Laptop className="w-4 h-4 text-blue-500" /> 3. IT Contact Support Center
+              </h4>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block font-mono">Support Email Address</label>
+                <input
+                  type="email"
+                  value={cmsSupportEmail}
+                  onChange={(e) => setCmsSupportEmail(e.target.value)}
+                  placeholder="it.support@vetiva.com"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-semibold"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block font-mono">Emergency Hotline / Ext.</label>
+                <input
+                  type="text"
+                  value={cmsSupportPhone}
+                  onChange={(e) => setCmsSupportPhone(e.target.value)}
+                  placeholder="+234 1 448 9000"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-705 outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-semibold"
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-150 rounded-lg">
+                <div className="space-y-0.5">
+                  <span className="text-[11px] font-bold text-slate-700 block">Enable IT Sandbox Debug Mode</span>
+                  <span className="text-[9px] text-slate-400 block font-medium">Bypasses strict verification states for rapid testing.</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={cmsDebugEnabled}
+                  onChange={(e) => setCmsDebugEnabled(e.target.checked)}
+                  className="w-4 h-4 accent-blue-600 scale-110 cursor-pointer"
+                />
+              </div>
+
+            </div>
+
+            {/* Box 4: IT Department Database Maintenance Danger Zone */}
+            <div className="bg-rose-50/50 border border-rose-200 p-5 rounded-xl space-y-4 shadow-2xs">
+              <h4 className="text-sm font-black text-rose-800 border-b border-rose-200/60 pb-2 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-rose-600" /> 4. Emergency Database Danger Zone
+              </h4>
+
+              <p className="text-[11px] text-rose-600 leading-relaxed font-sans font-medium">
+                IT operations can execute database flush commands instantly. This action is immutable and overrides normal locks. Confirmations will prompt beforehand.
+              </p>
+
+              <div className="space-y-2.5 pt-2">
+                <button
+                  type="button"
+                  id="flush-advances-btn"
+                  onClick={() => {
+                    if (confirm("🚨 EMERGENCY ACTION 🚨\nAre you sure you want to permanently delete ALL Cash Advance requests? This action is irreversible and clears all active lists.")) {
+                      onPurgeAdvances();
+                      alert("Database cleaned: All Cash Advance requests permanently purged.");
+                    }
+                  }}
+                  className="w-full py-2 bg-white hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 rounded-lg text-xs font-black transition-all cursor-pointer hover:shadow-md"
+                >
+                  🧨 Clear Cash Advance Database ({advances.length} records)
+                </button>
+
+                <button
+                  type="button"
+                  id="flush-retirements-btn"
+                  onClick={() => {
+                    if (confirm("🚨 EMERGENCY ACTION 🚨\nAre you sure you want to permanently delete ALL expensed retirement files? This will reset matching advance reconciliations.")) {
+                      onPurgeRetirements();
+                      alert("Database cleaned: All retirements data permanently purged.");
+                    }
+                  }}
+                  className="w-full py-2 bg-white hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 rounded-lg text-xs font-black transition-all cursor-pointer hover:shadow-md"
+                >
+                  🧨 Clear Retirements Database ({retirements.length} records)
+                </button>
+              </div>
+
+              <div className="pt-2 border-t border-rose-200/50">
+                <p className="text-[9px] text-rose-500 font-bold uppercase tracking-wider font-mono">Authorized IT Access Level • Root Permissions Active</p>
+              </div>
+
+            </div>
+
+          </div>
+
         </div>
       )}
 

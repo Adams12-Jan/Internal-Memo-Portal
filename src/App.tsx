@@ -20,7 +20,8 @@ import {
   AuditLogEntry,
   NotificationEntry,
   DEPARTMENTS,
-  STAFF_MEMBERS
+  STAFF_MEMBERS,
+  SystemCustomSettings
 } from './types';
 
 import { 
@@ -68,6 +69,103 @@ export default function App() {
   const [activeUserIdx, setActiveUserIdx] = useState(() => parseInt(localStorage.getItem('ca_session_user_idx') || '0'));
   
   const currentUser = staffMembers[activeUserIdx] || staffMembers[0] || { name: 'John Doe', role: UserRole.ADMIN_OFFICER, department: 'Administration' };
+
+  // CMS System Settings Controller (Full IT admin access)
+  const DEFAULT_SYSTEM_SETTINGS: SystemCustomSettings = {
+    maxCashAdvance: 2000000,
+    retirementWindowDays: 14,
+    requiresExecutiveApprovalAbove: 1000000,
+    customLogoText: 'Memo Portal',
+    themeAccent: 'default',
+    borderStyle: 'default',
+    supportEmail: 'it.support@vetiva.com',
+    supportPhone: '+234 1 448 9000',
+    debugBarEnabled: true
+  };
+
+  const [systemSettings, setSystemSettings] = useState<SystemCustomSettings>(() => {
+    const raw = localStorage.getItem('ca_system_settings');
+    if (raw) {
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        // use default
+      }
+    }
+    return DEFAULT_SYSTEM_SETTINGS;
+  });
+
+  const handleSaveSystemSettings = (nextSettings: SystemCustomSettings) => {
+    setSystemSettings(nextSettings);
+    localStorage.setItem('ca_system_settings', JSON.stringify(nextSettings));
+    
+    // Log system configuration change in audit log
+    const newAudit: AuditLogEntry = {
+      id: `sys-${Date.now()}`,
+      requestReference: 'SYSTEM_CONFIG',
+      type: 'System',
+      user: currentUser.name,
+      role: currentUser.role,
+      action: 'CMS Theme & System Rules Configuration Updated',
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      comment: `Primary accent: ${nextSettings.themeAccent}, Limit: ₦${nextSettings.maxCashAdvance.toLocaleString()}`
+    };
+    const nextLogs = [newAudit, ...logs];
+    setLogs(nextLogs);
+    saveStoredData({ logs: nextLogs });
+  };
+
+  // Dynamic CSS injector for CMS custom branding themes & styles
+  useEffect(() => {
+    const pAccent = systemSettings?.themeAccent || 'default';
+    const borderStyle = systemSettings?.borderStyle || 'default';
+    let p500 = '#9F9055', p600 = '#9F9055', p700 = '#8A7C4A', p100 = '#E6E1C8', p50 = '#F9F8F3';
+    
+    if (pAccent === 'blue') {
+      p500 = '#2563EB'; p600 = '#1d4ed8'; p700 = '#1e40af'; p100 = '#dbeafe'; p50 = '#f0f9ff';
+    } else if (pAccent === 'purple') {
+      p500 = '#8B5CF6'; p600 = '#7C3AED'; p700 = '#6D28D9'; p100 = '#f3e8ff'; p50 = '#faf5ff';
+    } else if (pAccent === 'emerald') {
+      p500 = '#10B981'; p600 = '#059669'; p700 = '#047857'; p100 = '#d1fae5'; p50 = '#ecfdf5';
+    } else if (pAccent === 'crimson') {
+      p500 = '#EF4444'; p600 = '#DC2626'; p700 = '#B91C1C'; p100 = '#fee2e2'; p50 = '#fef2f2';
+    } else if (pAccent === 'orange') {
+      p500 = '#F97316'; p600 = '#EA580C'; p700 = '#C2410C'; p100 = '#ffedd5'; p50 = '#fff7ed';
+    }
+
+    let rXl = '0.75rem', rLg = '0.5rem', rMd = '0.375rem';
+    if (borderStyle === 'sharp') {
+      rXl = '0px'; rLg = '0px'; rMd = '0px';
+    } else if (borderStyle === 'rounded') {
+      rXl = '1.75rem'; rLg = '1.25rem'; rMd = '0.85rem';
+    }
+
+    const cssContent = `
+      :root {
+        --color-blue-500: ${p500} !important;
+        --color-blue-600: ${p600} !important;
+        --color-blue-700: ${p700} !important;
+        --color-blue-100: ${p100} !important;
+        --color-blue-50: ${p50} !important;
+        
+        --color-amber-600: ${p600} !important;
+        --color-amber-700: ${p700} !important;
+        --color-amber-100: ${p100} !important;
+
+        --radius-xl: ${rXl} !important;
+        --radius-lg: ${rLg} !important;
+        --radius-md: ${rMd} !important;
+      }
+    `;
+
+    let styleEl = document.getElementById('dynamic-cms-theme-block');
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = 'dynamic-cms-theme-block';
+      document.head.appendChild(styleEl);
+    }
+    styleEl.innerHTML = cssContent;
+  }, [systemSettings, currentUser]);
 
   // Navigation
   const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, requests, retirement, reports, audit, crm
@@ -1043,6 +1141,40 @@ export default function App() {
     }
   };
 
+  const handlePurgeAdvances = () => {
+    setAdvances([]);
+    saveStoredData({ advances: [] });
+    
+    const nextLogs: AuditLogEntry[] = [{
+      id: `sys-${Date.now()}`,
+      requestReference: 'SYSTEM_CONFIG',
+      type: 'System',
+      user: currentUser.name,
+      role: currentUser.role,
+      action: 'Emergency Cash Advances Database Purged via IT CMS Controls',
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16)
+    }, ...logs];
+    setLogs(nextLogs);
+    saveStoredData({ logs: nextLogs });
+  };
+
+  const handlePurgeRetirements = () => {
+    setRetirements([]);
+    saveStoredData({ retirements: [] });
+
+    const nextLogs: AuditLogEntry[] = [{
+      id: `sys-${Date.now()}`,
+      requestReference: 'SYSTEM_CONFIG',
+      type: 'System',
+      user: currentUser.name,
+      role: currentUser.role,
+      action: 'Emergency Retirements Database Purged via IT CMS Controls',
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16)
+    }, ...logs];
+    setLogs(nextLogs);
+    saveStoredData({ logs: nextLogs });
+  };
+
   if (!isLoggedIn) {
     return (
       <LoginPortal
@@ -1069,7 +1201,7 @@ export default function App() {
                 <img src="https://imgur.com/Om0LsC2.png" alt="Company Logo" className="h-full object-contain" referrerPolicy="no-referrer" />
               </div>
               <div className="min-w-0">
-                <h1 className="font-extrabold text-slate-100 text-sm tracking-tight leading-none uppercase truncate">Memo Portal</h1>
+                <h1 className="font-extrabold text-slate-100 text-sm tracking-tight leading-none uppercase truncate">{systemSettings.customLogoText}</h1>
                 <p className="text-[9px] text-slate-400 mt-1 uppercase tracking-widest font-mono">Internal Portal</p>
               </div>
             </div>
@@ -1209,7 +1341,7 @@ export default function App() {
                 <div className="h-7 flex items-center justify-center shrink-0">
                   <img src="https://imgur.com/Om0LsC2.png" alt="Logo" className="h-full object-contain" referrerPolicy="no-referrer" />
                 </div>
-                <h1 className="font-bold text-slate-800 text-xs tracking-tight uppercase leading-none truncate">Memo Portal</h1>
+                <h1 className="font-bold text-slate-800 text-xs tracking-tight uppercase leading-none truncate">{systemSettings.customLogoText}</h1>
               </div>
 
               <div className="hidden lg:flex items-center space-x-2">
@@ -1365,6 +1497,7 @@ export default function App() {
                   onCancel={() => setIsInitiatingAdvance(false)}
                   nextReferenceNumber={generateRefId(advances.map(a => a.referenceNumber))}
                   currentUser={currentUser}
+                  maxAmount={systemSettings.maxCashAdvance}
                 />
               ) : selectedRequestId ? (
                 <RequestDetails
@@ -1658,6 +1791,10 @@ export default function App() {
               onResetFactoryDefault={handleResetAppToFactoryDefault}
               advances={advances}
               retirements={retirements}
+              systemSettings={systemSettings}
+              onSaveSystemSettings={handleSaveSystemSettings}
+              onPurgeAdvances={handlePurgeAdvances}
+              onPurgeRetirements={handlePurgeRetirements}
             />
           )}
 
