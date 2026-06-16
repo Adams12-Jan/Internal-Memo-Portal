@@ -1022,37 +1022,7 @@ export default function App() {
   return (
     <div id="full-app-root" className="min-h-screen bg-slate-100 flex flex-col font-sans select-none antialiased">
       
-      {/* Simulation Helper Ribbons - Identity Panel */}
-      <div id="sandbox-identity-ribbon" className="bg-slate-950 text-white text-xs px-4 py-3 border-b border-slate-800 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 print:hidden">
-        <div className="flex items-center gap-2">
-          <ShieldAlert className="w-4 h-4 text-amber-400 animate-pulse" />
-          <span className="font-semibold tracking-wider uppercase text-blue-300">Internal Memo Panel</span>
-          <span className="hidden md:inline text-slate-400">| Use quick toggles below to execute multi-role workflow transitions easily:</span>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-1.5 w-full lg:w-auto">
-          {STAFF_MEMBERS.map((staff, idx) => {
-            const isActive = activeUserIdx === idx;
-            return (
-              <button
-                id={`role-toggle-btn-${idx}`}
-                key={staff.name}
-                onClick={() => handleSwitchUser(idx)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold font-sans transition-all cursor-pointer ${
-                  isActive 
-                    ? 'bg-blue-600 text-white shadow-xs scale-102 border border-blue-500' 
-                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
-                }`}
-                title={`Switch profile to ${staff.name} (${staff.role})`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-amber-300 animate-ping' : 'bg-slate-400'}`}></span>
-                <span className="truncate max-w-28">{staff.name}</span>
-                <span className="text-[9px] opacity-70 font-mono font-medium">({staff.role.slice(0, 10)})</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
 
       {/* Framework container containing sidebar and content workdesk */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-0 min-w-0">
@@ -1476,8 +1446,7 @@ export default function App() {
                                     <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                                       item.currentStatus === RequestStatus.PAID ? 'bg-emerald-50 text-emerald-800 border-emerald-100' :
                                       item.currentStatus === RequestStatus.REJECTED ? 'bg-rose-50 text-rose-800 border-rose-100' :
-                                      item.currentStatus === RequestStatus.AWAITING_FINANCE_PAYMENT ? 'bg-blue-50 text-blue-800 border-blue-100' :
-                                      'bg-amber-50 text-amber-800 border-amber-100'
+                                      'bg-red-50 text-red-800 border-red-100 animate-pulse'
                                     }`}>
                                       {item.currentStatus} {isRetired && '(Retired Claims Closed)'}
                                     </span>
@@ -1587,7 +1556,7 @@ export default function App() {
                                   <span className={`inline-block px-2 py-0.5 rounded-[10px] font-bold ${
                                     item.currentStatus === RetirementStatus.APPROVED ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' :
                                     item.currentStatus === RetirementStatus.REJECTED ? 'bg-rose-50 text-rose-800 border border-rose-100' :
-                                    'bg-amber-50 text-amber-800 border border-amber-100'
+                                    'bg-red-50 text-red-800 border border-red-100 animate-pulse'
                                   }`}>
                                     {item.currentStatus}
                                   </span>

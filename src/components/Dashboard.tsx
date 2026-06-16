@@ -725,11 +725,11 @@ export default function Dashboard({
                   <div 
                     id={`urgent-item-${request.id}`}
                     key={request.id}
-                    className="p-4 rounded-lg bg-blue-50/40 border border-blue-100 hover:border-blue-300 transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
+                    className="p-4 rounded-lg bg-red-50/90 border border-red-200 hover:border-red-400 dark:bg-red-950/25 dark:border-red-900/60 transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded">
+                        <span className="font-mono text-xs font-bold text-red-700 bg-red-150 dark:text-red-300 dark:bg-red-950/80 px-2 py-0.5 rounded">
                           {request.referenceNumber}
                         </span>
                         <span className="text-xs text-slate-400 font-medium font-mono">{request.requestDate}</span>
@@ -745,7 +745,7 @@ export default function Dashboard({
                     <div className="flex flex-col items-end shrink-0 gap-2 w-full sm:w-auto border-t sm:border-0 pt-2 sm:pt-0 border-slate-200">
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs font-semibold text-slate-400">Advance Amt:</span>
-                        <span className="text-sm font-extrabold text-blue-800 font-mono">₦{request.amountRequested}</span>
+                        <span className="text-sm font-extrabold text-slate-900 font-mono">₦{request.amountRequested}</span>
                       </div>
                       <button
                         id={`process-advance-btn-${request.id}`}
@@ -754,7 +754,7 @@ export default function Dashboard({
                           onSetTab('requests');
                           onSelectRequest(request.id);
                         }}
-                        className="text-xs bg-blue-600 text-white font-semibold py-1.5 px-3 rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
+                        className="text-xs bg-red-600 text-white font-semibold py-1.5 px-3 rounded hover:bg-red-700 transition-colors flex items-center gap-1 shadow-xs shadow-red-200"
                       >
                         Action Portal <ArrowUpRight className="w-3.5 h-3.5" />
                       </button>
@@ -767,17 +767,17 @@ export default function Dashboard({
                   <div 
                     id={`urgent-ret-item-${ret.id}`}
                     key={ret.id}
-                    className="p-4 rounded-lg bg-amber-50/40 border border-amber-100 hover:border-amber-300 transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
+                    className="p-4 rounded-lg bg-red-50/90 border border-red-200 hover:border-red-400 dark:bg-red-950/25 dark:border-red-900/60 transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+                        <span className="font-mono text-xs font-bold text-red-750 bg-red-150 px-2 py-0.5 rounded">
                           {ret.id} (For {ret.cashAdvanceRef})
                         </span>
                         <span className="text-xs text-slate-400 font-medium font-mono">{ret.retirementDate}</span>
                       </div>
                       <h5 className="font-semibold text-slate-800 text-sm mt-1.5">
-                        Retirement claim for cash advance fund of <span className="font-bold font-mono text-amber-800">₦{ret.amountAdvanced}</span>
+                        Retirement claim for cash advance fund of <span className="font-bold font-mono text-slate-909">₦{ret.amountAdvanced}</span>
                       </h5>
                       <p className="text-xs text-slate-600 mt-1">
                         Utilized: <strong className="font-mono text-slate-800">₦{ret.amountUtilized}</strong> • Returned Balance: <strong className="font-mono text-emerald-800">₦{ret.balanceReturned}</strong>
@@ -785,7 +785,7 @@ export default function Dashboard({
                     </div>
 
                     <div className="flex flex-col items-end shrink-0 gap-2 w-full sm:w-auto border-t sm:border-0 pt-2 sm:pt-0 border-slate-200">
-                      <span className="text-[10px] bg-amber-100/80 text-amber-800 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                      <span className="text-[10px] bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-400 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
                         Retirement Verify
                       </span>
                       <button
@@ -794,7 +794,7 @@ export default function Dashboard({
                           onSetTab('retirement');
                           // set sub-focus or selection? Direct link is perfect! We will select it.
                         }}
-                        className="text-xs bg-amber-600 text-white font-semibold py-1.5 px-3 rounded hover:bg-amber-700 transition-colors flex items-center gap-1"
+                        className="text-xs bg-red-600 text-white font-semibold py-1.5 px-3 rounded hover:bg-red-700 transition-colors flex items-center gap-1 shadow-xs shadow-red-200"
                       >
                         Verify Settle <ArrowUpRight className="w-3.5 h-3.5" />
                       </button>
