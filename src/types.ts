@@ -78,6 +78,7 @@ export interface CashAdvanceRequest {
   expectedRetirementDate: string;
   attachmentName?: string;
   comment?: string;
+  signatureSvg?: string;
   currentStatus: RequestStatus;
   initiator: string;
   approvalHistory: ApprovalHistoryEntry[];

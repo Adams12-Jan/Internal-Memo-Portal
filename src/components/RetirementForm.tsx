@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ArrowLeft, Plus, Trash2, Calendar, DollarSign, FileText, 
-  Paperclip, UploadCloud, AlertCircle, CheckCircle, Info, Sparkles 
+  Paperclip, UploadCloud, AlertCircle, CheckCircle, Info, Sparkles, Upload, PenTool 
 } from 'lucide-react';
 import { CashAdvanceRequest, CashAdvanceRetirement, ExpenseItem, RetirementStatus, DEPARTMENTS } from '../types';
 
@@ -29,6 +29,22 @@ export default function RetirementForm({
   ]);
 
   const [errors, setErrors] = useState<string>('');
+
+  // Signature States for Retirement comments
+  const [signatureMode, setSignatureMode] = useState<'typed' | 'drawn' | 'imported'>('typed');
+  const [typedSignature, setTypedSignature] = useState('John Doe');
+  const [drawnSignature, setDrawnSignature] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+
+  // Sync signature name if loaded CA changes
+  useEffect(() => {
+    if (selectedCA) {
+      setTypedSignature(selectedCA.staffName);
+    } else {
+      setTypedSignature('John Doe');
+    }
+  }, [selectedCA]);
 
   // When CA dropdown selection changes, auto fill advanced balance
   useEffect(() => {
@@ -59,6 +75,82 @@ export default function RetirementForm({
     }));
   };
 
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.strokeStyle = '#2563eb'; // blue-600 color
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const rect = canvas.getBoundingClientRect();
+    let x, y;
+    if ('touches' in e) {
+      if (e.touches.length === 0) return;
+      x = e.touches[0].clientX - rect.left;
+      y = e.touches[0].clientY - rect.top;
+    } else {
+      x = e.clientX - rect.left;
+      y = e.clientY - rect.top;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    setIsDrawing(true);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    let x, y;
+    if ('touches' in e) {
+      if (e.touches.length === 0) return;
+      x = e.touches[0].clientX - rect.left;
+      y = e.touches[0].clientY - rect.top;
+    } else {
+      x = e.clientX - rect.left;
+      y = e.clientY - rect.top;
+    }
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      setDrawnSignature(canvas.toDataURL());
+    }
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setDrawnSignature(null);
+  };
+
+  const handleImportSignature = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result && typeof e.target.result === 'string') {
+        setDrawnSignature(e.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Derived amounts
   const amountAdvanced = selectedCA ? selectedCA.amountRequested : 0;
   const amountUtilized = expenses.reduce((sum, item) => sum + (parseFloat(item.amount as any) || 0), 0);
@@ -80,6 +172,10 @@ export default function RetirementForm({
 
     setErrors('');
 
+    const finalSignature = signatureMode === 'typed' 
+      ? `typed:${typedSignature || selectedCA?.staffName || 'John Doe'}` 
+      : (drawnSignature ? `drawn:${drawnSignature}` : `typed:${selectedCA?.staffName || 'John Doe'}`);
+
     const newRetirement: Partial<CashAdvanceRetirement> = {
       cashAdvanceRef: selectedCARef,
       amountAdvanced: amountAdvanced,
@@ -97,7 +193,8 @@ export default function RetirementForm({
           userName: selectedCA?.staffName || 'John Doe',
           action: 'Submit Retirement',
           date: '2026-06-12 09:30',
-          comment: expenseComment || 'Submitting receipts for validation'
+          comment: expenseComment || 'Submitting receipts for validation',
+          signatureSvg: finalSignature
         }
       ]
     };
@@ -351,19 +448,145 @@ export default function RetirementForm({
             </div>
           </div>
 
-          {/* Retirement Comment */}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
-              General Retirement Comment logs
-            </label>
-            <textarea
-              id="ret-form-comment"
-              rows={2}
-              placeholder="Provide information regarding cash leftover returns, cashier slips, or budget audits..."
-              className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-blue-500 transition-all text-slate-700"
-              value={expenseComment}
-              onChange={(e) => setExpenseComment(e.target.value)}
-            />
+          {/* Retirement Comment and E-Signature block */}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+                General Retirement Comment logs
+              </label>
+              <textarea
+                id="ret-form-comment"
+                rows={2}
+                placeholder="Provide information regarding cash leftover returns, cashier slips, or budget audits..."
+                className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-blue-500 transition-all text-slate-700"
+                value={expenseComment}
+                onChange={(e) => setExpenseComment(e.target.value)}
+              />
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/65 pb-2 mb-2">
+                <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                  ✍️ Retirement Verification E-Signature
+                </label>
+                <div className="flex bg-slate-200/60 p-0.5 rounded-lg text-[10px] font-extrabold w-fit">
+                  <button
+                    type="button"
+                    onClick={() => setSignatureMode('typed')}
+                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${signatureMode === 'typed' ? 'bg-white shadow-xs text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+                  >
+                    Type Name
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSignatureMode('drawn')}
+                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${signatureMode === 'drawn' ? 'bg-white shadow-xs text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+                  >
+                    Draw Freehand
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSignatureMode('imported')}
+                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${signatureMode === 'imported' ? 'bg-white shadow-xs text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+                  >
+                    Import Device
+                  </button>
+                </div>
+              </div>
+
+              {signatureMode === 'typed' ? (
+                <div className="space-y-1.5">
+                  <p className="text-[9px] text-slate-400 leading-normal">
+                    This dynamic cursive text represents your verified digital signature:
+                  </p>
+                  <input
+                    type="text"
+                    className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500 font-sans tracking-wide font-medium"
+                    value={typedSignature}
+                    onChange={(e) => setTypedSignature(e.target.value)}
+                    placeholder="Type signature name..."
+                  />
+                  <div className="bg-amber-50/20 border border-amber-200/30 rounded-lg p-3 flex items-center justify-center min-h-[60px] select-none">
+                    <span className="font-serif italic text-2xl text-blue-700 tracking-widest font-bold">
+                      {typedSignature}
+                    </span>
+                  </div>
+                </div>
+              ) : signatureMode === 'drawn' ? (
+                <div className="space-y-1.5">
+                  <p className="text-[9px] text-slate-400 leading-normal">
+                    Use your trackpad, cursor or fingers to sketch your approval credentials:
+                  </p>
+                  <div className="relative border border-slate-200 rounded-lg bg-white overflow-hidden">
+                    <canvas
+                      ref={canvasRef}
+                      width={360}
+                      height={100}
+                      className="w-full h-[100px] bg-white cursor-crosshair block"
+                      onMouseDown={startDrawing}
+                      onMouseMove={draw}
+                      onMouseUp={stopDrawing}
+                      onMouseLeave={stopDrawing}
+                      onTouchStart={startDrawing}
+                      onTouchMove={draw}
+                      onTouchEnd={stopDrawing}
+                    />
+                    <button
+                      type="button"
+                      onClick={clearCanvas}
+                      className="absolute right-2 bottom-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-2 py-1 rounded text-[10px] uppercase tracking-wider transition-colors cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  {drawnSignature ? (
+                    <div className="text-[9px] text-emerald-600 font-bold flex items-center gap-1 mt-1 justify-end">
+                      <span>✓ Custom signature sketch saved</span>
+                    </div>
+                  ) : (
+                    <div className="text-[9px] text-slate-400 flex items-center gap-1 mt-1 justify-end">
+                      <span>⏳ Complete gesture on canvas pad</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <p className="text-[9px] text-slate-400 leading-normal">
+                    Import any handwriting image file from your device files context:
+                  </p>
+                  <div className="border border-dashed border-slate-300 hover:border-blue-400 rounded-lg bg-white p-4 transition-colors relative cursor-pointer group text-center">
+                    <input
+                      id="import-ret-sig-details-file"
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) {
+                          handleImportSignature(e.target.files[0]);
+                        }
+                      }}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                    {drawnSignature && signatureMode === 'imported' ? (
+                      <div className="flex flex-col items-center gap-1.5">
+                        <span className="text-[9px] font-semibold text-slate-400">Current Imported Signature Preview:</span>
+                        <img src={drawnSignature} className="h-14 max-h-16 object-contain bg-slate-50 border p-1 rounded mx-auto" alt="Imported Signature" referrerPolicy="no-referrer" />
+                        <span className="text-[9px] text-blue-600 font-bold font-sans">Replace device file</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1.5 py-1">
+                        <div className="p-2 bg-slate-100 rounded-full text-slate-600 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors inline-block">
+                          <Upload className="w-5 h-5 mx-auto" strokeWidth={2.5} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-700">Choose file or drag here</p>
+                          <p className="text-[9px] text-slate-400 font-medium">Supports PNG, JPG, GIF files up to 2MB</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Action buttons */}

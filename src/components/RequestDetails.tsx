@@ -3,7 +3,7 @@ import {
   ArrowLeft, CheckCircle, XCircle, HelpCircle, FileText, Send, 
   MessageSquare, Calendar, DollarSign, ShieldAlert, BadgeAlert,
   User, Check, AlertCircle, Clock, RotateCcw, AlertTriangle, Printer,
-  FileCheck, Eye, UploadCloud, X, Paperclip
+  FileCheck, Eye, UploadCloud, X, Paperclip, Upload
 } from 'lucide-react';
 import { CashAdvanceRequest, RequestStatus, UserRole, PaymentMethod, STAFF_MEMBERS, PaymentDetails } from '../types';
 
@@ -52,7 +52,7 @@ export default function RequestDetails({
   const [isDragOver, setIsDragOver] = useState(false);
 
   // E-Signature state manager
-  const [signatureMode, setSignatureMode] = useState<'typed' | 'drawn'>('typed');
+  const [signatureMode, setSignatureMode] = useState<'typed' | 'drawn' | 'imported'>('typed');
   const [typedSignature, setTypedSignature] = useState(currentUserName);
   const [drawnSignature, setDrawnSignature] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -126,6 +126,16 @@ export default function RequestDetails({
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setDrawnSignature(null);
+  };
+
+  const handleImportSignature = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result && typeof e.target.result === 'string') {
+        setDrawnSignature(e.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   // Determine current active workflow step for visual stepper
@@ -266,16 +276,23 @@ export default function RequestDetails({
             <button
               type="button"
               onClick={() => setSignatureMode('typed')}
-              className={`px-2.5 py-1 rounded-md transition-all ${signatureMode === 'typed' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`px-2 py-1 rounded-md transition-all cursor-pointer ${signatureMode === 'typed' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
             >
               Type Name
             </button>
             <button
               type="button"
               onClick={() => setSignatureMode('drawn')}
-              className={`px-2.5 py-1 rounded-md transition-all ${signatureMode === 'drawn' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${signatureMode === 'drawn' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
             >
               Draw Freehand
+            </button>
+            <button
+              type="button"
+              onClick={() => setSignatureMode('imported')}
+              className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${signatureMode === 'imported' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+            >
+              Import Device
             </button>
           </div>
         </div>
@@ -298,7 +315,7 @@ export default function RequestDetails({
               </span>
             </div>
           </div>
-        ) : (
+        ) : signatureMode === 'drawn' ? (
           <div className="space-y-1.5">
             <p className="text-[9px] text-slate-400 leading-normal">
               Draw your signature inside the sandbox canvas. Use your mouse pointer or touch responsive screens:
@@ -320,7 +337,7 @@ export default function RequestDetails({
               <button
                 type="button"
                 onClick={clearCanvas}
-                className="absolute right-2 bottom-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-2 py-1 rounded text-[10px] uppercase tracking-wider transition-colors"
+                className="absolute right-2 bottom-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-2 py-1 rounded text-[10px] uppercase tracking-wider transition-colors cursor-pointer"
               >
                 Clear Pad
               </button>
@@ -334,6 +351,42 @@ export default function RequestDetails({
                 <span>⏳ Draw on canvas pad to populate binary stream</span>
               </div>
             )}
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <p className="text-[9px] text-slate-400 leading-normal">
+              Import any handdrawn signature file or image from your device storage:
+            </p>
+            <div className="border border-dashed border-slate-300 hover:border-blue-400 rounded-lg bg-white p-4 transition-colors relative cursor-pointer group text-center">
+              <input
+                id="import-sig-file-details"
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) {
+                    handleImportSignature(e.target.files[0]);
+                  }
+                }}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              />
+              {drawnSignature && signatureMode === 'imported' ? (
+                <div className="flex flex-col items-center gap-1.5">
+                  <span className="text-[9px] font-semibold text-slate-400">Current Imported Signature Preview:</span>
+                  <img src={drawnSignature} className="h-14 max-h-16 object-contain bg-slate-50 border p-1 rounded mx-auto" alt="Imported Signature" referrerPolicy="no-referrer" />
+                  <span className="text-[9px] text-blue-600 font-bold">Replace device file</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-1.5 py-1">
+                  <div className="p-2 bg-slate-100 rounded-full text-slate-600 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors inline-block">
+                    <Upload className="w-5 h-5 mx-auto" strokeWidth={2.5} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-700">Choose file or drag here</p>
+                    <p className="text-[9px] text-slate-400 font-medium">Supports PNG, JPG, GIF files up to 2MB</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

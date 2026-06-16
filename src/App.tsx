@@ -361,6 +361,38 @@ export default function App() {
     handleSaveData(advances, retirements, logs, nextNotifs);
   };
 
+  const handleSendCustomAlert = (
+    recipientRole: UserRole | 'All',
+    text: string,
+    requestId: string,
+    type: 'reminder' | 'approval_required' | 'status_change' | 'escalation'
+  ) => {
+    const timestamp = getTimestampString();
+    const newNotif: NotificationEntry = {
+      id: `nt-${Date.now()}`,
+      recipientRole: recipientRole,
+      text: text,
+      date: timestamp,
+      isRead: false,
+      requestId: requestId,
+      type: type
+    };
+    const nextNotifications = [newNotif, ...notifications];
+    
+    const newLog: AuditLogEntry = {
+      id: `log-${Date.now()}`,
+      requestReference: requestId,
+      type: 'System',
+      user: currentUser.name,
+      role: currentUser.role,
+      action: 'Broadcast Alert Command',
+      date: timestamp,
+      comment: `Dispatched [${type}] to ${recipientRole}: ${text}`
+    };
+    
+    handleSaveData(advances, retirements, [newLog, ...logs], nextNotifications);
+  };
+
   const handleSelectRequestDirectly = (requestId: string) => {
     setSelectedRequestId(requestId);
     setSelectedRetirementId(null);
@@ -394,7 +426,8 @@ export default function App() {
           userName: currentUser.name,
           action: reqMeta.currentStatus === RequestStatus.DRAFT ? 'Saved Draft' : 'Submit',
           date: timestamp,
-          comment: reqMeta.comment || 'Request set up'
+          comment: reqMeta.comment || 'Request set up',
+          signatureSvg: reqMeta.signatureSvg
         }
       ]
     };
@@ -1198,10 +1231,12 @@ export default function App() {
               {/* Live Notifications bell */}
               <NotificationBell
                 notifications={notifications}
+                advances={advances}
                 currentRole={currentUser.role}
                 onMarkAsRead={handleMarkAsRead}
                 onMarkAllAsRead={handleMarkAllAsRead}
                 onSelectRequest={handleSelectRequestDirectly}
+                onSendCustomAlert={handleSendCustomAlert}
               />
 
               {/* Light/Dark Mode Switcher */}
