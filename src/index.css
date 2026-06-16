@@ -7,39 +7,44 @@
 }
 
 /* Custom global dark mode overrides */
+/* Ensure everything in the document remains strictly black & white / grayscale */
+html {
+  filter: grayscale(100%) !important;
+}
+
 .dark {
   color-scheme: dark;
 }
 
 .dark #full-app-root {
-  background-color: #090d16 !important; /* rich navy dark slate */
-  color: #f8fafc !important;
+  background-color: #000000 !important; /* Pure black core */
+  color: #ffffff !important;
 }
 
 .dark #main-desktop-sidebar {
-  background-color: #0d1527 !important;
-  border-color: #1e293b !important;
+  background-color: #0a0a0a !important; /* Onyx */
+  border-color: #262626 !important;
 }
 
 .dark #app-primary-header {
-  background-color: #0f172a !important;
-  border-color: #1e293b !important;
+  background-color: #0d0d0d !important;
+  border-color: #262626 !important;
 }
 
 .dark #app-primary-footer {
-  background-color: #0f172a !important;
-  border-color: #1e293b !important;
-  color: #94a3b8 !important;
+  background-color: #0d0d0d !important;
+  border-color: #262626 !important;
+  color: #a3a3a3 !important;
 }
 
-/* Card backgrounds and borders */
+/* Card backgrounds and borders in dark mode */
 .dark .bg-white,
 .dark .bg-slate-50\/50,
 .dark .bg-blue-50\/50,
 .dark .bg-slate-50 {
-  background-color: #0d1527 !important; /* card background */
-  color: #f1f5f9 !important;
-  border-color: #1e293b !important;
+  background-color: #0a0a0a !important;
+  color: #ffffff !important;
+  border-color: #262626 !important;
 }
 
 /* Override borders */
@@ -48,68 +53,67 @@
 .dark .border-slate-150,
 .dark .border-slate-300,
 .dark .border-blue-100 {
-  border-color: #1e293b !important;
+  border-color: #262626 !important;
 }
 
-/* Text elements */
+/* Text elements overlay */
 .dark .text-slate-800,
 .dark .text-slate-900,
 .dark .text-slate-805,
 .dark .text-slate-705,
 .dark .text-slate-700,
 .dark .text-slate-600 {
-  color: #e2e8f0 !important;
+  color: #f5f5f5 !important;
 }
 
 .dark .text-slate-500,
 .dark .text-slate-400 {
-  color: #94a3b8 !important;
+  color: #a3a3a3 !important;
 }
 
 /* Input, option, selector backgrounds */
 .dark input,
 .dark select,
-.dark textarea,
-.dark .bg-slate-50 {
-  background-color: #111827 !important;
-  color: #f8fafc !important;
-  border-color: #374151 !important;
+.dark textarea {
+  background-color: #0f0f0f !important;
+  color: #ffffff !important;
+  border-color: #262626 !important;
 }
 
 .dark input:focus,
 .dark select:focus {
-  border-color: #3b82f6 !important;
+  border-color: #ffffff !important;
 }
 
-/* Specific elements background adjustments */
+/* Banner adjustment - from colorful gradients to high contrast monochrome */
 .dark #welcome-dashboard-banner {
-  background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%) !important;
-  border-color: #1e40af !important;
+  background: linear-gradient(135deg, #1f1f1f 0%, #000000 100%) !important;
+  border-color: #262626 !important;
 }
 
 .dark .divide-slate-100 > * {
-  border-color: #1e293b !important;
+  border-color: #262626 !important;
 }
 
 .dark .divide-slate-200 > * {
-  border-color: #1e293b !important;
+  border-color: #262626 !important;
 }
 
 .dark tr:hover {
-  background-color: #111827 !important;
+  background-color: #121212 !important;
 }
 
 .dark thead {
-  background-color: #090d16 !important;
+  background-color: #050505 !important;
 }
 
 .dark thead th {
-  color: #94a3b8 !important;
-  border-bottom: 2px solid #1e293b !important;
+  color: #a3a3a3 !important;
+  border-bottom: 2px solid #262626 !important;
 }
 
 .dark .bg-slate-900 {
-  background-color: #0d1527 !important;
+  background-color: #0d0d0d !important;
 }
 
 /* Let's style scrollbar for dark mode compatibility */

@@ -1066,7 +1066,7 @@ export default function App() {
                 <img src="https://imgur.com/Om0LsC2.png" alt="Company Logo" className="h-full object-contain" referrerPolicy="no-referrer" />
               </div>
               <div className="min-w-0">
-                <h1 className="font-extrabold text-slate-100 text-sm tracking-tight leading-none uppercase truncate">Vetiva Memo</h1>
+                <h1 className="font-extrabold text-slate-100 text-sm tracking-tight leading-none uppercase truncate">Memo Portal</h1>
                 <p className="text-[9px] text-slate-400 mt-1 uppercase tracking-widest font-mono">Internal Portal</p>
               </div>
             </div>
@@ -1206,7 +1206,7 @@ export default function App() {
                 <div className="h-7 flex items-center justify-center shrink-0">
                   <img src="https://imgur.com/Om0LsC2.png" alt="Logo" className="h-full object-contain" referrerPolicy="no-referrer" />
                 </div>
-                <h1 className="font-bold text-slate-800 text-xs tracking-tight uppercase leading-none truncate">Vetiva Memo</h1>
+                <h1 className="font-bold text-slate-800 text-xs tracking-tight uppercase leading-none truncate">Memo Portal</h1>
               </div>
 
               <div className="hidden lg:flex items-center space-x-2">
