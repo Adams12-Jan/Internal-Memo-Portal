@@ -28,7 +28,7 @@ export enum RequestStatus {
 export enum RetirementStatus {
   DRAFT = 'Draft',
   SUBMITTED = 'Submitted',
-  PENDING_HEAD_OF_ADMIN = 'Pending Head of Admin Audit',
+  PENDING_HEAD_OF_ADMIN = 'Pending Head of Admin Approve/Verify',
   PENDING_INTERNAL_CONTROL = 'Pending Internal Control Compliance',
   PENDING_EXECUTIVE_OFFICE = 'Pending Executive Office Clearance',
   PENDING_HEAD_OF_ADMIN_RELEASE = 'Pending Release to Finance',
@@ -77,6 +77,7 @@ export interface CashAdvanceRequest {
   amountRequested: number;
   expectedRetirementDate: string;
   attachmentName?: string;
+  attachmentUrl?: string; // URL to uploaded attachment file
   comment?: string;
   signatureSvg?: string;
   currentStatus: RequestStatus;
@@ -95,6 +96,7 @@ export interface CashAdvanceRetirement {
   retirementDate: string;
   expenseDetails: ExpenseItem[];
   receiptName?: string;
+  receiptUrl?: string; // URL to uploaded receipt file
   comment?: string;
   currentStatus: RetirementStatus;
   approvedDate?: string;
@@ -134,12 +136,12 @@ export const DEPARTMENTS = [
 ];
 
 export const STAFF_MEMBERS: { name: string; role: UserRole; department: string }[] = [
-  { name: 'John Doe', role: UserRole.ADMIN_OFFICER, department: 'Administration' },
-  { name: 'Sarah Jenkins', role: UserRole.HEAD_OF_ADMIN, department: 'Administration' },
-  { name: 'Marcus Vance', role: UserRole.INTERNAL_CONTROL, department: 'Internal Audit & Control' },
-  { name: 'Elizabeth Stone', role: UserRole.EXECUTIVE_OFFICE, department: 'Executive Office' },
-  { name: 'Robert Finch', role: UserRole.FINANCE_OFFICER, department: 'Finance & Accounts' },
-  { name: 'Alex Mercer', role: UserRole.SYSTEM_ADMIN, department: 'IT & Systems' }
+  { name: 'Ovat Daniel', role: UserRole.ADMIN_OFFICER, department: 'Administration' },
+  { name: 'Tina Ofeno', role: UserRole.HEAD_OF_ADMIN, department: 'Administration' },
+  { name: 'Jelili Lamidi', role: UserRole.INTERNAL_CONTROL, department: 'Internal Audit & Control' },
+  { name: 'Oyelade Eigbe', role: UserRole.EXECUTIVE_OFFICE, department: 'Executive Office' },
+  { name: 'Finance & Account', role: UserRole.FINANCE_OFFICER, department: 'Finance & Accounts' },
+  { name: 'IT Support', role: UserRole.SYSTEM_ADMIN, department: 'IT & Systems' }
 ];
 
 export interface EmailTemplate {

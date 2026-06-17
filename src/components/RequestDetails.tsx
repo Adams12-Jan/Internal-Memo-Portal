@@ -6,6 +6,7 @@ import {
   FileCheck, Eye, UploadCloud, X, Paperclip, Upload
 } from 'lucide-react';
 import { CashAdvanceRequest, RequestStatus, UserRole, PaymentMethod, STAFF_MEMBERS, PaymentDetails } from '../types';
+import { uploadFileToBackend, uploadFileToMicrosoft, requestMicrosoftSign } from '../services/microsoftApi';
 
 interface RequestDetailsProps {
   request: CashAdvanceRequest;
@@ -49,6 +50,13 @@ export default function RequestDetails({
   const [beneficiaryName, setBeneficiaryName] = useState(request.staffName);
   const [proofOfPaymentName, setProofOfPaymentName] = useState('');
   const [proofOfPaymentUrl, setProofOfPaymentUrl] = useState('');
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofUploadStatus, setProofUploadStatus] = useState('');
+  const [proofBackendUrl, setProofBackendUrl] = useState('');
+  const [proofMicrosoftUrl, setProofMicrosoftUrl] = useState('');
+  const [proofUploadDestination, setProofUploadDestination] = useState<'local' | 'onedrive' | 'sharepoint'>('local');
+  const [isUploadInProgress, setIsUploadInProgress] = useState(false);
+  const [isSigningProof, setIsSigningProof] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
   // E-Signature state manager
@@ -624,14 +632,26 @@ export default function RequestDetails({
                     <FileText className="w-4 h-4 text-blue-600" />
                     <span className="text-xs text-slate-700 truncate font-semibold font-mono">{request.attachmentName}</span>
                   </div>
-                  <button
-                    id="view-attachment-detail-btn"
-                    onClick={() => alert(`Simulating file download/view: ${request.attachmentName}`)}
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 hover:underline"
-                    type="button"
-                  >
-                    View File
-                  </button>
+                  {request.attachmentUrl ? (
+                    <a
+                      id="view-attachment-detail-btn"
+                      href={request.attachmentUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 hover:underline"
+                    >
+                      View File
+                    </a>
+                  ) : (
+                    <button
+                      id="view-attachment-detail-btn"
+                      onClick={() => alert(`Simulating file download/view: ${request.attachmentName}`)}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 hover:underline"
+                      type="button"
+                    >
+                      View File
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1064,8 +1084,12 @@ export default function RequestDetails({
                           onChange={(e) => {
                             if (e.target.files && e.target.files[0]) {
                               const file = e.target.files[0];
+                              setProofFile(file);
                               setProofOfPaymentName(file.name);
-                              setProofOfPaymentUrl('SIMULATED_UPLOADED_FILE_URL');
+                              setProofOfPaymentUrl('');
+                              setProofUploadStatus('Ready to upload to portal');
+                              setProofBackendUrl('');
+                              setProofMicrosoftUrl('');
                             }
                           }}
                           accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
@@ -1080,24 +1104,130 @@ export default function RequestDetails({
                             <p className="text-[8px] text-slate-400 leading-normal">Supports PDF, PNG or images up to 10MB</p>
                           </label>
                         ) : (
-                          <div className="flex items-center justify-between bg-white border border-emerald-100 p-1.5 rounded text-left">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <FileCheck className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
-                              <span className="font-mono text-[10px] text-slate-700 truncate font-semibold">
-                                {proofOfPaymentName}
-                              </span>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between bg-white border border-emerald-100 p-3 rounded text-left">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <FileCheck className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
+                                <span className="font-mono text-[10px] text-slate-700 truncate font-semibold">
+                                  {proofOfPaymentName}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setProofOfPaymentName('');
+                                  setProofOfPaymentUrl('');
+                                  setProofFile(null);
+                                  setProofUploadStatus('');
+                                  setProofBackendUrl('');
+                                  setProofMicrosoftUrl('');
+                                }}
+                                className="p-1 text-slate-400 hover:text-rose-500 rounded cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
                             </div>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setProofOfPaymentName('');
-                                setProofOfPaymentUrl('');
-                              }}
-                              className="p-1 text-slate-400 hover:text-rose-500 rounded cursor-pointer"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
+
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!proofFile) return;
+                                  setIsUploadInProgress(true);
+                                  setProofUploadStatus('Uploading to internal portal...');
+                                  try {
+                                    const result = await uploadFileToBackend(proofFile);
+                                    setProofBackendUrl(result.fileUrl);
+                                    setProofOfPaymentUrl(result.fileUrl);
+                                    setProofUploadStatus('Portal upload successful.');
+                                  } catch (error) {
+                                    setProofUploadStatus(`Portal upload failed: ${error instanceof Error ? error.message : String(error)}`);
+                                  } finally {
+                                    setIsUploadInProgress(false);
+                                  }
+                                }}
+                                className="text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white py-2 rounded transition-all"
+                                disabled={!proofFile || isUploadInProgress}
+                              >
+                                Upload to Portal
+                              </button>
+
+                              <div className="flex items-center gap-2">
+                                <select
+                                  value={proofUploadDestination}
+                                  onChange={(e) => setProofUploadDestination(e.target.value as 'local' | 'onedrive' | 'sharepoint')}
+                                  className="w-full text-xs border border-slate-200 rounded-lg p-2 bg-white"
+                                >
+                                  <option value="onedrive">OneDrive</option>
+                                  <option value="sharepoint">SharePoint</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!proofFile) return;
+                                  setIsUploadInProgress(true);
+                                  setProofUploadStatus(`Uploading to ${proofUploadDestination}...`);
+                                  try {
+                                    const result = await uploadFileToMicrosoft(proofFile, proofUploadDestination === 'sharepoint' ? 'sharepoint' : 'onedrive');
+                                    setProofMicrosoftUrl(result.shareUrl || '');
+                                    setProofUploadStatus(result.message);
+                                    if (result.shareUrl) {
+                                      setProofOfPaymentUrl(result.shareUrl);
+                                    }
+                                  } catch (error) {
+                                    setProofUploadStatus(`Microsoft upload failed: ${error instanceof Error ? error.message : String(error)}`);
+                                  } finally {
+                                    setIsUploadInProgress(false);
+                                  }
+                                }}
+                                className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white py-2 rounded transition-all"
+                                disabled={!proofFile || isUploadInProgress}
+                              >
+                                Upload to {proofUploadDestination === 'sharepoint' ? 'SharePoint' : 'OneDrive'}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!proofFile) return;
+                                  setIsSigningProof(true);
+                                  setProofUploadStatus('Requesting document signing...');
+                                  try {
+                                    const result = await requestMicrosoftSign(proofFile, currentUserName);
+                                    setProofOfPaymentUrl(result.signedUrl);
+                                    setProofUploadStatus(result.message);
+                                  } catch (error) {
+                                    setProofUploadStatus(`Signing request failed: ${error instanceof Error ? error.message : String(error)}`);
+                                  } finally {
+                                    setIsSigningProof(false);
+                                  }
+                                }}
+                                className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded transition-all"
+                                disabled={!proofFile || isSigningProof}
+                              >
+                                Request Signed Copy
+                              </button>
+                            </div>
+
+                            {proofUploadStatus && (
+                              <p className="text-[11px] text-slate-500 italic">{proofUploadStatus}</p>
+                            )}
+
+                            {proofBackendUrl && (
+                              <a href={proofBackendUrl} target="_blank" rel="noreferrer" className="text-[11px] text-blue-600 underline block truncate">
+                                View portal copy
+                              </a>
+                            )}
+                            {proofMicrosoftUrl && (
+                              <a href={proofMicrosoftUrl} target="_blank" rel="noreferrer" className="text-[11px] text-blue-600 underline block truncate">
+                                View Microsoft copy
+                              </a>
+                            )}
                           </div>
                         )}
                       </div>

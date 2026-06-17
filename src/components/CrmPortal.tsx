@@ -5,6 +5,7 @@ import {
   ChevronRight, Laptop, Smartphone, HelpCircle, ShieldAlert 
 } from 'lucide-react';
 import { EmailTemplate, SentEmail, UserRole, DEPARTMENTS, SystemCustomSettings } from '../types';
+import crmClient from '../services/crmClient';
 import { Palette, Wrench, ShieldCheck } from 'lucide-react';
 
 interface CrmPortalProps {
@@ -43,7 +44,7 @@ export default function CrmPortal({
   onPurgeRetirements
 }: CrmPortalProps) {
   // Sub-tabs: templates, sentLog, directory, utilities, settings
-  const [subTab, setSubTab] = useState<'templates' | 'sentLog' | 'directory' | 'utilities' | 'settings'>('templates');
+  const [subTab, setSubTab] = useState<'templates' | 'sentLog' | 'directory' | 'deals' | 'campaigns' | 'utilities' | 'settings'>('templates');
   
   // 1. Template States
   const [selectedTemplateId, setSelectedTemplateId] = useState(templates[0]?.id || '');
@@ -61,8 +62,33 @@ export default function CrmPortal({
   const [editStaffName, setEditStaffName] = useState('');
   const [editStaffRole, setEditStaffRole] = useState<UserRole>(UserRole.ADMIN_OFFICER);
   const [editStaffDept, setEditStaffDept] = useState('Administration');
+  // Directory UI helpers: loading, errors, pagination, search, sync
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [contactsError, setContactsError] = useState<string | null>(null);
+  const [contactsPage, setContactsPage] = useState(0);
+  const [contactsPageSize, setContactsPageSize] = useState(10);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [lastSync, setLastSync] = useState<number | null>(null);
 
-  // 3. System settings CMS states
+  // 3. Deals state
+  const [dealsLoading, setDealsLoading] = useState(false);
+  const [dealsError, setDealsError] = useState<string | null>(null);
+  const [deals, setDeals] = useState<any[]>([]);
+  const [newDealName, setNewDealName] = useState('');
+  const [newDealValue, setNewDealValue] = useState('0');
+  const [newDealStage, setNewDealStage] = useState('Prospect');
+  const [editingDealIdx, setEditingDealIdx] = useState<number | null>(null);
+
+  // 4. Campaigns state
+  const [campaignsLoading, setCampaignsLoading] = useState(false);
+  const [campaignsError, setCampaignsError] = useState<string | null>(null);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [newCampaignName, setNewCampaignName] = useState('');
+  const [newCampaignSubject, setNewCampaignSubject] = useState('');
+  const [newCampaignStatus, setNewCampaignStatus] = useState('Draft');
+  const [editingCampaignIdx, setEditingCampaignIdx] = useState<number | null>(null);
+
+  // 5. System settings CMS states
   const [cmsLogoText, setCmsLogoText] = useState(systemSettings.customLogoText);
   const [cmsMaxAdvance, setCmsMaxAdvance] = useState(systemSettings.maxCashAdvance);
   const [cmsRetireDays, setCmsRetireDays] = useState(systemSettings.retirementWindowDays);
@@ -98,7 +124,7 @@ export default function CrmPortal({
   const compileTemplateHTML = (html: string, recordId: string) => {
     // Pick an active record or fallback mock
     let refNum = "CA-2026-003";
-    let staff = "John Doe";
+    let staff = "Ovat Daniel";
     let dept = "Administration";
     let purpose = "Procurement of office stationery and printing materials";
     let amtReq = "450";
@@ -201,9 +227,140 @@ export default function CrmPortal({
       role: newStaffRole,
       department: newStaffDept
     };
-    onUpdateStaffMembers([...staffMembers, addedMember]);
-    setNewStaffName('');
-    alert(`Personnel "${addedMember.name}" successfully incorporated into staff directory registry!`);
+    // Try to persist to backend CRM, fall back to local update
+    (async () => {
+      try {
+        const payload = { name: addedMember.name, department: addedMember.department, role: String(addedMember.role) };
+        const created = await crmClient.createContact(payload as any);
+        // map created contact to staff member representation
+        const next = [...staffMembers, { name: created.name || addedMember.name, role: addedMember.role, department: created.department || addedMember.department }];
+        onUpdateStaffMembers(next);
+        setNewStaffName('');
+        // refresh current page after successful create
+        setTimeout(() => fetchPageContacts(contactsPage, contactsPageSize, searchQuery), 200);
+        alert(`Personnel "${addedMember.name}" successfully incorporated into staff directory registry (synced).`);
+      } catch (err) {
+        // fallback local
+        onUpdateStaffMembers([...staffMembers, addedMember]);
+        setNewStaffName('');
+        alert(`Personnel "${addedMember.name}" added locally (backend unavailable).`);
+      }
+    })();
+  };
+
+  const fetchPageContacts = async (page: number, pageSize: number, q: string) => {
+    setContactsLoading(true);
+    setContactsError(null);
+    try {
+      const offset = page * pageSize;
+      const contacts: any[] = await crmClient.getContacts(pageSize, offset);
+      // If backend returned an array, map and update staffMembers
+      if (Array.isArray(contacts)) {
+        const mapped = contacts.map((c: any) => ({ name: c.name || '', role: (c.role as UserRole) || UserRole.ADMIN_OFFICER, department: c.department || 'Administration' }));
+        onUpdateStaffMembers(mapped);
+      }
+      setLastSync(Date.now());
+    } catch (e: any) {
+      setContactsError(String(e?.message || e));
+    } finally {
+      setContactsLoading(false);
+    }
+  };
+
+  const fetchDeals = async (pageSize = 50, offset = 0) => {
+    setDealsLoading(true);
+    setDealsError(null);
+    try {
+      const dealsList: any[] = await crmClient.getDeals(pageSize, offset);
+      if (Array.isArray(dealsList)) {
+        setDeals(dealsList);
+      }
+    } catch (e: any) {
+      setDealsError(String(e?.message || e));
+    } finally {
+      setDealsLoading(false);
+    }
+  };
+
+  const fetchCampaigns = async (pageSize = 50, offset = 0) => {
+    setCampaignsLoading(true);
+    setCampaignsError(null);
+    try {
+      const campaignsList: any[] = await crmClient.getCampaigns(pageSize, offset);
+      if (Array.isArray(campaignsList)) {
+        setCampaigns(campaignsList);
+      }
+    } catch (e: any) {
+      setCampaignsError(String(e?.message || e));
+    } finally {
+      setCampaignsLoading(false);
+    }
+  };
+
+  const handleAddDeal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDealName.trim()) {
+      alert("Please enter a valid deal name.");
+      return;
+    }
+    try {
+      const payload = { name: newDealName.trim(), value: Number(newDealValue) || 0, stage: newDealStage };
+      const created = await crmClient.createDeal(payload);
+      setDeals([...deals, created]);
+      setNewDealName('');
+      setNewDealValue('0');
+      alert(`Deal "${newDealName}" created successfully.`);
+      fetchDeals();
+    } catch (err) {
+      alert(`Error creating deal: ${err}`);
+    }
+  };
+
+  const handleDeleteDeal = async (index: number) => {
+    const deal = deals[index];
+    if (confirm(`Delete deal "${deal.name}"?`)) {
+      try {
+        await crmClient.deleteDeal(deal.id);
+        setDeals(deals.filter((_, i) => i !== index));
+        alert("Deal deleted successfully.");
+        fetchDeals();
+      } catch (err) {
+        alert(`Error deleting deal: ${err}`);
+      }
+    }
+  };
+
+  const handleAddCampaign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCampaignName.trim()) {
+      alert("Please enter a valid campaign name.");
+      return;
+    }
+    try {
+      const payload = { name: newCampaignName.trim(), subject: newCampaignSubject, status: newCampaignStatus };
+      const created = await crmClient.createCampaign(payload);
+      setCampaigns([...campaigns, created]);
+      setNewCampaignName('');
+      setNewCampaignSubject('');
+      alert(`Campaign "${newCampaignName}" created successfully.`);
+      fetchCampaigns();
+    } catch (err) {
+      alert(`Error creating campaign: ${err}`);
+    }
+  };
+
+  const handleDeleteCampaign = async (index: number) => {
+    const campaign = campaigns[index];
+    if (confirm(`Delete campaign "${campaign.name}"?`)) {
+      try {
+        await crmClient.deleteCampaign(campaign.id);
+        setCampaigns(campaigns.filter((_, i) => i !== index));
+        alert("Campaign deleted successfully.");
+        fetchCampaigns();
+      } catch (err) {
+        alert(`Error deleting campaign: ${err}`);
+      }
+    }
   };
 
   const handleEditStaff = (index: number) => {
@@ -237,11 +394,50 @@ export default function CrmPortal({
     }
     const person = staffMembers[index];
     if (confirm(`Remove "${person.name}" from active staff registers? Dynamic login simulations will clear.`)) {
-      const nextList = staffMembers.filter((_, idx) => idx !== index);
-      onUpdateStaffMembers(nextList);
-      alert("Personnel permanently detached from active organizational directories.");
+      (async () => {
+        try {
+          // attempt to find contact by name via CRM search and delete first match
+          const contacts = await crmClient.getContacts(50, 0);
+          const match = contacts.find((c: any) => String(c.name).toLowerCase() === String(person.name).toLowerCase());
+          if (match && match.id) {
+            await crmClient.deleteContact(match.id);
+            // refresh current page after removal
+            setTimeout(() => fetchPageContacts(contactsPage, contactsPageSize, searchQuery), 200);
+          }
+        } catch (e) {
+          // ignore errors and continue with local removal
+        }
+        const nextList = staffMembers.filter((_, idx) => idx !== index);
+        onUpdateStaffMembers(nextList);
+        alert("Personnel permanently detached from active organizational directories.");
+      })();
     }
   };
+
+  // Load CRM contacts when directory tab is active
+  useEffect(() => {
+    if (subTab !== 'directory') return;
+    // Load the current page with optional search
+    fetchPageContacts(contactsPage, contactsPageSize, searchQuery);
+  }, [subTab]);
+
+  // refetch when page, pageSize or query changes while directory is active
+  useEffect(() => {
+    if (subTab !== 'directory') return;
+    fetchPageContacts(contactsPage, contactsPageSize, searchQuery);
+  }, [contactsPage, contactsPageSize, searchQuery]);
+
+  // Load CRM deals when deals tab is active
+  useEffect(() => {
+    if (subTab !== 'deals') return;
+    fetchDeals();
+  }, [subTab]);
+
+  // Load CRM campaigns when campaigns tab is active
+  useEffect(() => {
+    if (subTab !== 'campaigns') return;
+    fetchCampaigns();
+  }, [subTab]);
 
   // View modal helper for looking at html outbox logs
   const [viewingEmailBody, setViewingEmailBody] = useState<string | null>(null);
@@ -282,6 +478,20 @@ export default function CrmPortal({
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${subTab === 'directory' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
           >
             Corporate Staff ({staffMembers.length})
+          </button>
+          <button 
+            id="subtab-deals"
+            onClick={() => setSubTab('deals')}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${subTab === 'deals' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+          >
+            Sales Deals ({deals.length})
+          </button>
+          <button 
+            id="subtab-campaigns"
+            onClick={() => setSubTab('campaigns')}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${subTab === 'campaigns' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+          >
+            Campaigns ({campaigns.length})
           </button>
           <button 
             id="subtab-utilities"
@@ -625,6 +835,47 @@ export default function CrmPortal({
               </span>
             </div>
 
+            {/* Directory controls: search, page size, pagination, sync status */}
+            <div className="flex items-center justify-between gap-3 pb-3">
+              <div className="flex items-center gap-2 w-full">
+                <input
+                  id="directory-search-input"
+                  placeholder="Search staff by name or department..."
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setContactsPage(0); }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-xs outline-none focus:border-blue-500"
+                />
+                <select
+                  id="directory-page-size"
+                  value={contactsPageSize}
+                  onChange={(e) => { setContactsPageSize(Number(e.target.value)); setContactsPage(0); }}
+                  className="bg-white border border-slate-200 rounded px-2 py-1 text-xs"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="text-xs text-slate-500 mr-2">{contactsLoading ? 'Syncing…' : (lastSync ? `Synced ${new Date(lastSync).toLocaleTimeString()}` : 'Never synced')}</div>
+                {contactsError && (
+                  <div className="text-[11px] text-rose-600 font-semibold">Error: {contactsError}</div>
+                )}
+                <button
+                  id="directory-prev-page"
+                  onClick={() => setContactsPage(p => Math.max(0, p - 1))}
+                  className="px-2 py-1 bg-slate-100 border border-slate-200 rounded text-xs"
+                >Prev</button>
+                <div className="text-xs font-mono px-2">Page {contactsPage + 1}</div>
+                <button
+                  id="directory-next-page"
+                  onClick={() => setContactsPage(p => p + 1)}
+                  className="px-2 py-1 bg-slate-100 border border-slate-200 rounded text-xs"
+                >Next</button>
+              </div>
+            </div>
+
             <div className="space-y-2 max-h-[450px] overflow-y-auto pr-1">
               {staffMembers.map((item, index) => {
                 const cleanEmail = item.name.toLowerCase().replace(/\s+/g, '.') + "@corporate.com";
@@ -720,7 +971,169 @@ export default function CrmPortal({
         </div>
       )}
 
-      {/* SUB-TAB 4: SYSTEM UTILITIES & SCHEDULER */}
+      {/* SUB-TAB 4: SALES DEALS MANAGEMENT */}
+      {subTab === 'deals' && (
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Add Deal Form */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs">
+              <h3 className="font-bold text-slate-800 text-sm mb-4 flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-blue-600" /> Create New Sales Deal
+              </h3>
+              <form onSubmit={handleAddDeal} className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Deal Name *</label>
+                  <input
+                    id="new-deal-name"
+                    type="text"
+                    placeholder="e.g. Enterprise Contract"
+                    className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-xs outline-none focus:border-blue-500"
+                    value={newDealName}
+                    onChange={(e) => setNewDealName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Deal Value ($)</label>
+                  <input
+                    id="new-deal-value"
+                    type="number"
+                    placeholder="0"
+                    className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-xs outline-none focus:border-blue-500"
+                    value={newDealValue}
+                    onChange={(e) => setNewDealValue(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Stage</label>
+                  <select
+                    id="new-deal-stage"
+                    className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-xs outline-none focus:border-blue-500"
+                    value={newDealStage}
+                    onChange={(e) => setNewDealStage(e.target.value)}
+                  >
+                    <option>Prospect</option>
+                    <option>Negotiation</option>
+                    <option>Closed Won</option>
+                    <option>Closed Lost</option>
+                  </select>
+                </div>
+                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded text-xs">
+                  Add Deal
+                </button>
+              </form>
+            </div>
+
+            {/* Deals List */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs">
+              <h3 className="font-bold text-slate-800 text-sm mb-4 flex items-center gap-2">
+                <Users className="w-4 h-4 text-blue-600" /> Active Deals ({deals.length})
+              </h3>
+              {dealsError && <div className="text-xs text-rose-600 mb-3">Error: {dealsError}</div>}
+              {dealsLoading && <div className="text-xs text-slate-500">Loading deals...</div>}
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {deals.map((deal, idx) => (
+                  <div key={idx} className="p-3 bg-slate-50 rounded border border-slate-150 flex justify-between items-start">
+                    <div>
+                      <h4 className="font-bold text-xs text-slate-800">{deal.name}</h4>
+                      <p className="text-[10px] text-slate-500">${deal.value || 0} • {deal.stage}</p>
+                    </div>
+                    <button
+                      id={`delete-deal-${idx}`}
+                      onClick={() => handleDeleteDeal(idx)}
+                      className="text-rose-600 hover:text-rose-800"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUB-TAB 5: EMAIL CAMPAIGNS MANAGEMENT */}
+      {subTab === 'campaigns' && (
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Add Campaign Form */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs">
+              <h3 className="font-bold text-slate-800 text-sm mb-4 flex items-center gap-2">
+                <Mail className="w-4 h-4 text-blue-600" /> Create New Campaign
+              </h3>
+              <form onSubmit={handleAddCampaign} className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Campaign Name *</label>
+                  <input
+                    id="new-campaign-name"
+                    type="text"
+                    placeholder="e.g. Spring Promotion"
+                    className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-xs outline-none focus:border-blue-500"
+                    value={newCampaignName}
+                    onChange={(e) => setNewCampaignName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Email Subject</label>
+                  <input
+                    id="new-campaign-subject"
+                    type="text"
+                    placeholder="e.g. Exclusive Offer Inside"
+                    className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-xs outline-none focus:border-blue-500"
+                    value={newCampaignSubject}
+                    onChange={(e) => setNewCampaignSubject(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Status</label>
+                  <select
+                    id="new-campaign-status"
+                    className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-xs outline-none focus:border-blue-500"
+                    value={newCampaignStatus}
+                    onChange={(e) => setNewCampaignStatus(e.target.value)}
+                  >
+                    <option>Draft</option>
+                    <option>Scheduled</option>
+                    <option>Sent</option>
+                    <option>Archived</option>
+                  </select>
+                </div>
+                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded text-xs">
+                  Create Campaign
+                </button>
+              </form>
+            </div>
+
+            {/* Campaigns List */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs">
+              <h3 className="font-bold text-slate-800 text-sm mb-4 flex items-center gap-2">
+                <Mail className="w-4 h-4 text-blue-600" /> Active Campaigns ({campaigns.length})
+              </h3>
+              {campaignsError && <div className="text-xs text-rose-600 mb-3">Error: {campaignsError}</div>}
+              {campaignsLoading && <div className="text-xs text-slate-500">Loading campaigns...</div>}
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {campaigns.map((campaign, idx) => (
+                  <div key={idx} className="p-3 bg-slate-50 rounded border border-slate-150 flex justify-between items-start">
+                    <div>
+                      <h4 className="font-bold text-xs text-slate-800">{campaign.name}</h4>
+                      <p className="text-[10px] text-slate-500">{campaign.subject || 'No subject'} • {campaign.status}</p>
+                    </div>
+                    <button
+                      id={`delete-campaign-${idx}`}
+                      onClick={() => handleDeleteCampaign(idx)}
+                      className="text-rose-600 hover:text-rose-800"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUB-TAB 6: SYSTEM UTILITIES & SCHEDULER */}
       {subTab === 'utilities' && (
         <div className="max-w-xl mx-auto bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-6 text-center">
           <ShieldAlert className="w-12 h-12 text-blue-600 mx-auto animate-pulse" />
@@ -773,7 +1186,7 @@ export default function CrmPortal({
         </div>
       )}
 
-      {/* SUB-TAB 5: IT DEPT GLOBAL CMS & THEMES SETTINGS */}
+      {/* SUB-TAB 7: IT DEPT GLOBAL CMS & THEMES SETTINGS */}
       {subTab === 'settings' && (
         <div className="max-w-4xl mx-auto space-y-6 animate-fade-in text-left">
           

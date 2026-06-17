@@ -4,6 +4,7 @@ import {
   CheckCircle, ArrowLeft, UploadCloud, Trash2, ClipboardList, Upload, PenTool 
 } from 'lucide-react';
 import { CashAdvanceRequest, RequestStatus, DEPARTMENTS, STAFF_MEMBERS } from '../types';
+import { uploadFileToBackend } from '../services/microsoftApi';
 
 interface CashAdvanceRequestFormProps {
   onAddRequest: (request: Partial<CashAdvanceRequest>) => void;
@@ -191,13 +192,25 @@ export default function CashAdvanceRequestForm({
     return Object.keys(tempErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent, isDraft: boolean) => {
+  const handleSubmit = async (e: React.FormEvent, isDraft: boolean) => {
     e.preventDefault();
     if (!isDraft && !validate()) return;
 
     const finalSignature = signatureMode === 'typed' 
       ? `typed:${typedSignature || currentUser.name}` 
       : (drawnSignature ? `drawn:${drawnSignature}` : `typed:${currentUser.name}`);
+
+    // Upload attachment if present
+    let attachmentUrl: string | undefined = undefined;
+    if (attachment && !isDraft) {
+      try {
+        const uploadResult = await uploadFileToBackend(attachment);
+        attachmentUrl = uploadResult.fileUrl;
+      } catch (error) {
+        console.error('Attachment upload failed:', error);
+        // Still proceed with request creation, just without the attachment URL
+      }
+    }
 
     // Build the request object
     const newRequest: Partial<CashAdvanceRequest> = {
@@ -209,6 +222,7 @@ export default function CashAdvanceRequestForm({
       amountRequested: parseFloat(amountRequested) || 0,
       expectedRetirementDate: expectedRetirementDate,
       attachmentName: attachment ? attachment.name : undefined,
+      attachmentUrl: attachmentUrl,
       comment: comment,
       signatureSvg: finalSignature,
       currentStatus: isDraft ? RequestStatus.DRAFT : RequestStatus.SUBMITTED,
@@ -219,39 +233,39 @@ export default function CashAdvanceRequestForm({
   };
 
   return (
-    <div id="new-request-container" className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm animate-fade-in relative max-w-4xl mx-auto">
+    <div id="new-request-container" className="bg-white rounded-xl border border-slate-200 p-4 md:p-6 lg:p-8 shadow-sm animate-fade-in relative max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100 justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 mb-6 pb-4 border-b border-slate-100 md:justify-between">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
           <button
             id="back-btn-req-form"
             onClick={onCancel}
-            className="p-1 px-2 hover:bg-slate-100 rounded text-slate-500 transition-colors flex items-center gap-1 text-xs font-semibold"
+            className="p-2 hover:bg-slate-100 rounded text-slate-500 transition-colors flex items-center gap-1 text-xs font-semibold active:scale-95 flex-shrink-0"
           >
-            <ArrowLeft className="w-4 h-4" /> Back to list
+            <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">Back</span>
           </button>
-          <div className="hidden sm:block h-4 w-px bg-slate-200"></div>
-          <div>
-            <h3 className="font-bold text-slate-800 text-lg">Initiate Cash Advance Allocation Memo</h3>
-            <p className="text-xs text-slate-500">Draft a funding request to trigger approval routing</p>
+          <div className="hidden md:block h-4 w-px bg-slate-200"></div>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-bold text-slate-800 text-base md:text-lg leading-tight">Initiate Cash Advance Allocation</h3>
+            <p className="text-xs text-slate-500 hidden sm:block">Draft a funding request to trigger approval routing</p>
           </div>
         </div>
-        <div className="bg-blue-50 text-blue-800 px-3 py-1.5 rounded-lg border border-blue-100 text-xs font-mono font-bold">
+        <div className="bg-blue-50 text-blue-800 px-3 py-2 rounded-lg border border-blue-100 text-xs font-mono font-bold flex-shrink-0">
           Ref: {nextReferenceNumber}
         </div>
       </div>
 
-      <form id="cash-advance-request-form" className="space-y-6">
+      <form id="cash-advance-request-form" className="space-y-4 md:space-y-6">
         {/* Row 1 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
               Reference Number (System Auto-Generated)
             </label>
             <input
               id="req-form-ref"
               type="text"
-              className={`w-full bg-white border rounded-lg p-2.5 font-mono text-xs font-semibold outline-none transition-all ${
+              className={`w-full bg-white border rounded-lg p-3 md:p-2.5 font-mono text-sm md:text-xs font-semibold outline-none transition-all active:scale-95 ${
                 errors.refNumber ? 'border-rose-400 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'
               }`}
               value={refNumber}
@@ -285,16 +299,16 @@ export default function CashAdvanceRequestForm({
         </div>
 
         {/* Row 2 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
               Staff Name / Beneficiary *
             </label>
-            <input
+              <input
               id="req-form-staff"
               type="text"
-              placeholder="e.g. John Doe, Sarah Jenkins"
-              className={`w-full bg-white border rounded-lg p-2.5 text-sm outline-none transition-all ${
+              placeholder="e.g. Ovat Daniel, Tina Ofeno"
+              className={`w-full bg-white border rounded-lg p-3 md:p-2.5 text-base md:text-sm outline-none transition-all active:scale-95 ${
                 errors.staffName ? 'border-rose-400 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'
               }`}
               value={staffName}
@@ -312,7 +326,7 @@ export default function CashAdvanceRequestForm({
             </label>
             <select
               id="req-form-dept"
-              className={`w-full bg-white border rounded-lg p-2.5 text-sm outline-none transition-all ${
+              className={`w-full bg-white border rounded-lg p-3 md:p-2.5 text-base md:text-sm outline-none transition-all active:scale-95 ${
                 errors.department ? 'border-rose-400 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'
               }`}
               value={department}
@@ -332,9 +346,9 @@ export default function CashAdvanceRequestForm({
         </div>
 
         {/* Row 3 */}
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
               Amount Requested (₦) *
             </label>
             <div className="relative">
@@ -614,12 +628,12 @@ export default function CashAdvanceRequestForm({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4 border-t border-slate-100">
           <button
             id="req-form-cancel-btn"
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-lg transition-colors border border-slate-200"
+            className="px-4 py-3 sm:py-2 text-sm font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-lg transition-colors border border-slate-200 active:scale-95"
           >
             Cancel & Back
           </button>
@@ -628,7 +642,7 @@ export default function CashAdvanceRequestForm({
             id="req-form-draft-btn"
             type="button"
             onClick={(e) => handleSubmit(e, true)}
-            className="px-4 py-2 text-sm font-semibold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-100"
+            className="px-4 py-3 sm:py-2 text-sm font-semibold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-100 active:scale-95"
           >
             Save as Draft
           </button>
@@ -637,9 +651,9 @@ export default function CashAdvanceRequestForm({
             id="req-form-submit-btn"
             type="button"
             onClick={(e) => handleSubmit(e, false)}
-            className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm flex items-center gap-1"
+            className="px-5 py-3 sm:py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm flex items-center justify-center gap-1 active:scale-95"
           >
-            <Plus className="w-4 h-4" /> Submit to Workflow
+            <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Submit</span><span className="sm:hidden">Submit to Workflow</span>
           </button>
         </div>
 

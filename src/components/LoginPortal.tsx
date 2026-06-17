@@ -105,7 +105,7 @@ export default function LoginPortal({ onLoginSuccess, staffList = STAFF_MEMBERS 
             </div>
             
             <div className="space-y-2">
-              <h1 className="text-2xl font-black tracking-tight text-white uppercase">INTERNAL MEMO PORTAL</h1>
+              <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white">Memo Approval Portal</h1>
             </div>
           </div>
 
@@ -134,7 +134,7 @@ export default function LoginPortal({ onLoginSuccess, staffList = STAFF_MEMBERS 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-bold text-white tracking-tight">Enterprise Sign-In</h2>
-                  <p className="text-xs text-slate-400 mt-1">Access the secure Internal Memo Portal via centralized dynamic authorization.</p>
+                  <p className="text-xs text-slate-400 mt-1">Access the secure Memo Approval Portal via centralized dynamic authorization.</p>
                 </div>
                 
                 {/* Custom Toggle Switch for 2FA Authenticator */}

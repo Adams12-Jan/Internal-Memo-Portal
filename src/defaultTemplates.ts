@@ -37,7 +37,7 @@ export const DEFAULT_TEMPLATES: EmailTemplate[] = [
     
     <!-- Body -->
     <div style="padding: 32px;">
-      <p style="margin: 0 0 20px 0; font-size: 14px; color: #475569;">Hello <strong>Sarah Jenkins (Head of Administration)</strong>,</p>
+      <p style="margin: 0 0 20px 0; font-size: 14px; color: #475569;">Hello <strong>Tina Ofeno (Head of Administration)</strong>,</p>
       
       <p style="margin: 0 0 20px 0; font-size: 14px; color: #475569; leading-relaxed: true;">
         A new administrative funding proposal has been logged and signed on the portal. Please review the parameters below and authorize forwarding into compliance desks:

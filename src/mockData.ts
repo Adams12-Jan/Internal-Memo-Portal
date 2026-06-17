@@ -19,138 +19,144 @@ export const INITIAL_CASH_ADVANCES: CashAdvanceRequest[] = [
     id: 'CA-2026-001',
     referenceNumber: 'CA-2026-001',
     requestDate: '2026-05-10',
-    staffName: 'John Doe',
+    staffName: 'Ovat Daniel',
     department: 'Administration',
     purpose: 'Procurement of office stationeries and high-density printing paper for Admin Department annual audit.',
     amountRequested: 450,
     expectedRetirementDate: '2026-05-24',
     attachmentName: 'quote_stationery_express.pdf',
+    attachmentUrl: '/quote_stationery_express.pdf',
     comment: 'Need this urgently so the audit materials are printed on time.',
     currentStatus: RequestStatus.PAID,
-    initiator: 'John Doe',
+    initiator: 'Ovat Daniel',
     approvalHistory: [
-      { userId: '1', userRole: UserRole.ADMIN_OFFICER, userName: 'John Doe', action: 'Submit', date: '2026-05-10 09:15', comment: 'Initiated request' },
-      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Sarah Jenkins', action: 'Approve', date: '2026-05-11 10:30', comment: 'Recommended for approval. Essential items.' },
-      { userId: '3', userRole: UserRole.INTERNAL_CONTROL, userName: 'Marcus Vance', action: 'Approve', date: '2026-05-11 14:45', comment: 'Verified against budget limit. Complies.' },
-      { userId: '4', userRole: UserRole.EXECUTIVE_OFFICE, userName: 'Elizabeth Stone', action: 'Approve', date: '2026-05-12 11:00', comment: 'Exe Office Approved.' },
-      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Sarah Jenkins', action: 'Send to Finance', date: '2026-05-12 12:15', comment: 'Sending to Finance for payment.' },
-      { userId: '5', userRole: UserRole.FINANCE_OFFICER, userName: 'Robert Finch', action: 'Pay', date: '2026-05-13 15:30', comment: 'Paid successfully via bank transfer.' }
+      { userId: '1', userRole: UserRole.ADMIN_OFFICER, userName: 'Ovat Daniel', action: 'Submit', date: '2026-05-10 09:15', comment: 'Initiated request' },
+      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Approve', date: '2026-05-11 10:30', comment: 'Recommended for approval. Essential items.' },
+      { userId: '3', userRole: UserRole.INTERNAL_CONTROL, userName: 'Jelili Lamidi', action: 'Approve', date: '2026-05-11 14:45', comment: 'Verified against budget limit. Complies.' },
+      { userId: '4', userRole: UserRole.EXECUTIVE_OFFICE, userName: 'Oyelaide Eigbe', action: 'Approve', date: '2026-05-12 11:00', comment: 'Exe Office Approved.' },
+      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina', action: 'Send to Finance', date: '2026-05-12 12:15', comment: 'Sending to Finance for payment.' },
+      { userId: '5', userRole: UserRole.FINANCE_OFFICER, userName: 'Finance & Account', action: 'Pay', date: '2026-05-13 15:30', comment: 'Paid successfully via bank transfer.' }
     ],
     paymentDetails: {
       paymentDate: '2026-05-13',
       paymentMethod: 'Bank Transfer',
       paymentReference: 'TXN-908127391',
       amountPaid: 450,
-      beneficiaryName: 'John Doe'
+      beneficiaryName: 'Ovat Daniel'
     }
   },
   {
     id: 'CA-2026-002',
     referenceNumber: 'CA-2026-002',
     requestDate: '2026-05-20',
-    staffName: 'John Doe',
+    staffName: 'Ovat Daniel',
     department: 'Administration',
     purpose: 'Local travel expenses for site inspection and inventory check at our warehouse branch.',
     amountRequested: 800,
     expectedRetirementDate: '2026-06-05', // Past current date of June 12, 2026 - Outstanding & OVERDUE!
     attachmentName: 'warehouse_itinerary.pdf',
+    attachmentUrl: '/warehouse_itinerary.pdf',
     comment: 'Covers transport, accommodation for 3 nights, and meal allowances.',
     currentStatus: RequestStatus.PAID,
-    initiator: 'John Doe',
+    initiator: 'Ovat Daniel',
     approvalHistory: [
-      { userId: '1', userRole: UserRole.ADMIN_OFFICER, userName: 'John Doe', action: 'Submit', date: '2026-05-20 10:00', comment: 'Travel approved by supervisor.' },
-      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Sarah Jenkins', action: 'Approve', date: '2026-05-21 09:00', comment: 'Standard travel rate applied.' },
-      { userId: '3', userRole: UserRole.INTERNAL_CONTROL, userName: 'Marcus Vance', action: 'Approve', date: '2026-05-21 15:30', comment: 'Checked travel ledger. Budget available.' },
-      { userId: '4', userRole: UserRole.EXECUTIVE_OFFICE, userName: 'Elizabeth Stone', action: 'Approve', date: '2026-05-22 10:45', comment: 'Approved.' },
-      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Sarah Jenkins', action: 'Send to Finance', date: '2026-05-22 11:30', comment: 'Released.' },
-      { userId: '5', userRole: UserRole.FINANCE_OFFICER, userName: 'Robert Finch', action: 'Pay', date: '2026-05-23 16:00', comment: 'Disbursed.' }
+      { userId: '1', userRole: UserRole.ADMIN_OFFICER, userName: 'Ovat Daniel', action: 'Submit', date: '2026-05-20 10:00', comment: 'Travel approved by supervisor.' },
+      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Approve', date: '2026-05-21 09:00', comment: 'Standard travel rate applied.' },
+      { userId: '3', userRole: UserRole.INTERNAL_CONTROL, userName: 'Jelili Lamidi', action: 'Approve', date: '2026-05-21 15:30', comment: 'Checked travel ledger. Budget available.' },
+      { userId: '4', userRole: UserRole.EXECUTIVE_OFFICE, userName: 'Oyelaide Eigbe', action: 'Approve', date: '2026-05-22 10:45', comment: 'Approved.' },
+      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Send to Finance', date: '2026-05-22 11:30', comment: 'Released.' },
+      { userId: '5', userRole: UserRole.FINANCE_OFFICER, userName: 'Finance & Account', action: 'Pay', date: '2026-05-23 16:00', comment: 'Disbursed.' }
     ],
     paymentDetails: {
       paymentDate: '2026-05-23',
       paymentMethod: 'Bank Transfer',
       paymentReference: 'TXN-908127402',
       amountPaid: 800,
-      beneficiaryName: 'John Doe'
+      beneficiaryName: 'Ovat Daniel'
     }
   },
   {
     id: 'CA-2026-003',
     referenceNumber: 'CA-2026-003',
     requestDate: '2026-06-09', // June 9, 2026 (awaiting payment since June 9, 2026. 3 days passed -> triggers reminder!)
-    staffName: 'John Doe',
+    staffName: 'Ovat Daniel',
     department: 'Administration',
     purpose: 'Purchase of catering items and refreshments for the regional staff conference.',
     amountRequested: 1200,
     expectedRetirementDate: '2026-06-18',
     attachmentName: 'catering_invoice_draft.pdf',
+    attachmentUrl: '/catering_invoice_draft.pdf',
     comment: 'Need to make payment deposit to vendor by week end.',
     currentStatus: RequestStatus.AWAITING_FINANCE_PAYMENT,
-    initiator: 'John Doe',
+    initiator: 'Ovat Daniel',
     daysAwaitingPaymentSince: '2026-06-09',
     approvalHistory: [
-      { userId: '1', userRole: UserRole.ADMIN_OFFICER, userName: 'John Doe', action: 'Submit', date: '2026-06-09 08:30', comment: 'Conference refreshments deposit.' },
-      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Sarah Jenkins', action: 'Approve', date: '2026-06-09 10:15', comment: 'Approved for budget routing.' },
-      { userId: '3', userRole: UserRole.INTERNAL_CONTROL, userName: 'Marcus Vance', action: 'Approve', date: '2026-06-09 13:40', comment: 'Budget code ADM-CONF-2026 verified.' },
-      { userId: '4', userRole: UserRole.EXECUTIVE_OFFICE, userName: 'Elizabeth Stone', action: 'Approve', date: '2026-06-09 15:50', comment: 'Approved for disbursement.' },
-      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Sarah Jenkins', action: 'Send to Finance', date: '2026-06-09 16:30', comment: 'Released to finance.' }
+      { userId: '1', userRole: UserRole.ADMIN_OFFICER, userName: 'Ovat Daniel', action: 'Submit', date: '2026-06-09 08:30', comment: 'Conference refreshments deposit.' },
+      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Approve', date: '2026-06-09 10:15', comment: 'Approved for budget routing.' },
+      { userId: '3', userRole: UserRole.INTERNAL_CONTROL, userName: 'Jelili Lamidi', action: 'Approve', date: '2026-06-09 13:40', comment: 'Budget code ADM-CONF-2026 verified.' },
+      { userId: '4', userRole: UserRole.EXECUTIVE_OFFICE, userName: 'Oyelaide Eigbe', action: 'Approve', date: '2026-06-09 15:50', comment: 'Approved for disbursement.' },
+      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Approve', date: '2026-06-09 10:15', comment: 'Forwarded to Finance.' },
+      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Finance & Account', action: 'Send to Finance', date: '2026-06-09 16:30', comment: 'Released to finance.' }
     ]
   },
   {
     id: 'CA-2026-004',
     referenceNumber: 'CA-2026-004',
     requestDate: '2026-06-06', // June 6, 2026 (awaiting payment since June 6, 2026. 6 days passed -> triggers system escalation!)
-    staffName: 'John Doe',
+    staffName: 'Ovat Daniel',
     department: 'Operations',
     purpose: 'Sewerage repairs and plumbing overhaul at the operations compound.',
     amountRequested: 2500,
     expectedRetirementDate: '2026-06-25',
     attachmentName: 'plumber_quote.pdf',
+    attachmentUrl: '/plumber_quote.pdf',
     comment: 'Plumbing leak is causing health hazard. Extremely critical repair.',
     currentStatus: RequestStatus.AWAITING_FINANCE_PAYMENT,
-    initiator: 'John Doe',
+    initiator: 'Ovat Daniel',
     daysAwaitingPaymentSince: '2026-06-06',
     approvalHistory: [
-      { userId: '1', userRole: UserRole.ADMIN_OFFICER, userName: 'John Doe', action: 'Submit', date: '2026-06-06 09:00', comment: 'Emergency plumber hire.' },
-      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Sarah Jenkins', action: 'Approve', date: '2026-06-06 09:30', comment: 'Highly urgent.' },
-      { userId: '3', userRole: UserRole.INTERNAL_CONTROL, userName: 'Marcus Vance', action: 'Approve', date: '2026-06-06 10:00', comment: 'Special budget earmark.' },
-      { userId: '4', userRole: UserRole.EXECUTIVE_OFFICE, userName: 'Elizabeth Stone', action: 'Approve', date: '2026-06-06 11:00', comment: 'Approved immediately.' },
-      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Sarah Jenkins', action: 'Send to Finance', date: '2026-06-06 11:15', comment: 'Forwarded to Finance with high-priority flag.' }
+      { userId: '1', userRole: UserRole.ADMIN_OFFICER, userName: 'Ovat Daniel', action: 'Submit', date: '2026-06-06 09:00', comment: 'Emergency plumber hire.' },
+      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Approve', date: '2026-06-06 09:30', comment: 'Highly urgent.' },
+      { userId: '3', userRole: UserRole.INTERNAL_CONTROL, userName: 'Jelili Lamidi', action: 'Approve', date: '2026-06-06 10:00', comment: 'Special budget earmark.' },
+      { userId: '4', userRole: UserRole.EXECUTIVE_OFFICE, userName: 'Oyelaide Eigbe', action: 'Approve', date: '2026-06-06 11:00', comment: 'Approved immediately.' },
+      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Send to Finance', date: '2026-06-06 11:15', comment: 'Forwarded to Finance with high-priority flag.' }
     ]
   },
   {
     id: 'CA-2026-005',
     referenceNumber: 'CA-2026-005',
     requestDate: '2026-06-11',
-    staffName: 'Sarah Jenkins',
+    staffName: 'Tina Ofeno',
     department: 'Administration',
     purpose: 'Internet subscription renewal (Fibre backhaul link for office buildings A & B).',
     amountRequested: 1500,
     expectedRetirementDate: '2026-06-25',
     attachmentName: 'isp_invoice_june.pdf',
+    attachmentUrl: '/isp_invoice_june.pdf',
     comment: 'To avoid service cutoff on June 15.',
     currentStatus: RequestStatus.PENDING_INTERNAL_CONTROL,
-    initiator: 'Sarah Jenkins',
+    initiator: 'Tina Ofeno',
     approvalHistory: [
-      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Sarah Jenkins', action: 'Submit', date: '2026-06-11 11:00', comment: 'Initiated as Head of Admin & user.' },
-      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Sarah Jenkins', action: 'Approve', date: '2026-06-11 11:01', comment: 'Self-approved at initial level.' }
+      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Submit', date: '2026-06-11 11:00', comment: 'Initiated as Head of Admin & user.' },
+      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Approve', date: '2026-06-11 11:01', comment: 'Self-approved at initial level.' }
     ]
   },
   {
     id: 'CA-2026-006',
     referenceNumber: 'CA-2026-006',
     requestDate: '2026-06-10',
-    staffName: 'John Doe',
+    staffName: 'Ovat Daniel',
     department: 'Operations',
     purpose: 'Provision of generic corporate gifts and custom branded mugs for visitors.',
     amountRequested: 350,
     expectedRetirementDate: '2026-06-30',
     comment: 'Requested for upcoming vendor visitation meeting.',
     currentStatus: RequestStatus.REJECTED,
-    initiator: 'John Doe',
+    initiator: 'Ovat Daniel',
     approvalHistory: [
-      { userId: '1', userRole: UserRole.ADMIN_OFFICER, userName: 'John Doe', action: 'Submit', date: '2026-06-10 14:00', comment: 'Submitted.' },
-      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Sarah Jenkins', action: 'Approve', date: '2026-06-10 15:10', comment: 'Forwarded.' },
-      { userId: '3', userRole: UserRole.INTERNAL_CONTROL, userName: 'Marcus Vance', action: 'Reject', date: '2026-06-10 16:45', comment: 'Prior unretired cash advances exist (CA-2026-002 is outstanding). No new advance can be approved for general items until outstanding limits are resolved or retired.' }
+      { userId: '1', userRole: UserRole.ADMIN_OFFICER, userName: 'Ovat Daniel', action: 'Submit', date: '2026-06-10 14:00', comment: 'Submitted.' },
+      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Approve', date: '2026-06-10 15:10', comment: 'Forwarded.' },
+      { userId: '3', userRole: UserRole.INTERNAL_CONTROL, userName: 'Jelili Lamidi', action: 'Reject', date: '2026-06-10 16:45', comment: 'Prior unretired cash advances exist (CA-2026-002 is outstanding). No new advance can be approved for general items until outstanding limits are resolved or retired.' }
     ]
   }
 ];
@@ -167,15 +173,16 @@ export const INITIAL_RETIREMENTS: CashAdvanceRetirement[] = [
     currentStatus: RetirementStatus.APPROVED,
     approvedDate: '2026-05-23',
     receiptName: 'stationery_receipt_435.pdf',
+    receiptUrl: '/stationery_receipt_435.pdf',
     expenseDetails: [
       { id: 'exp-1', description: 'Double A4 Printing Paper x10 Reams', category: 'Stationery', amount: 150, receiptName: 'stationery_receipt_435.pdf' },
       { id: 'exp-2', description: 'Laser Jet Ink Cartridges x2', category: 'Stationery', amount: 285, receiptName: 'stationery_receipt_435.pdf' }
     ],
     approvalHistory: [
-      { userId: '1', userRole: UserRole.ADMIN_OFFICER, userName: 'John Doe', action: 'Submit', date: '2026-05-22 14:00', comment: 'All receipts attached.' },
-      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Sarah Jenkins', action: 'Verify', date: '2026-05-22 15:30', comment: 'Receipts match values. Highly diligent.' },
-      { userId: '3', userRole: UserRole.INTERNAL_CONTROL, userName: 'Marcus Vance', action: 'Verify', date: '2026-05-23 10:15', comment: 'Certified. Returned balance verified.' },
-      { userId: '5', userRole: UserRole.FINANCE_OFFICER, userName: 'Robert Finch', action: 'Verify', date: '2026-05-23 14:00', comment: 'Finance verified. Cashier received $15 return. Retirement Closed.' }
+      { userId: '1', userRole: UserRole.ADMIN_OFFICER, userName: 'Ovat Daniel', action: 'Submit', date: '2026-05-22 14:00', comment: 'All receipts attached.' },
+      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Verify', date: '2026-05-22 15:30', comment: 'Receipts match values. Highly diligent.' },
+      { userId: '3', userRole: UserRole.INTERNAL_CONTROL, userName: 'Jelili Lamidi', action: 'Verify', date: '2026-05-23 10:15', comment: 'Certified. Returned balance verified.' },
+      { userId: '5', userRole: UserRole.FINANCE_OFFICER, userName: 'Finance & Account', action: 'Verify', date: '2026-05-23 14:00', comment: 'Finance verified. Cashier received $15 return. Retirement Closed.' }
     ]
   }
 ];
@@ -224,7 +231,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     id: 'g-1',
     requestReference: 'CA-2026-001',
     type: 'Cash Advance',
-    user: 'John Doe',
+    user: 'Ovat Daniel',
     role: UserRole.ADMIN_OFFICER,
     action: 'Created & Submitted Request',
     date: '2026-05-10 09:15',
@@ -234,7 +241,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     id: 'g-2',
     requestReference: 'CA-2026-001',
     type: 'Cash Advance',
-    user: 'Robert Finch',
+    user: 'Finance & Account',
     role: UserRole.FINANCE_OFFICER,
     action: 'Processed Payment',
     date: '2026-05-13 15:30',
@@ -244,7 +251,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     id: 'g-3',
     requestReference: 'CA-2026-001',
     type: 'Retirement',
-    user: 'John Doe',
+    user: 'Ovat Daniel',
     role: UserRole.ADMIN_OFFICER,
     action: 'Submitted Retirement Claim',
     date: '2026-05-22 14:00',
@@ -254,7 +261,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     id: 'g-4',
     requestReference: 'CA-2026-001',
     type: 'Retirement',
-    user: 'Robert Finch',
+    user: 'Finance & Account',
     role: UserRole.FINANCE_OFFICER,
     action: 'Final Verification & Close Retirement',
     date: '2026-05-23 14:00',
@@ -264,7 +271,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     id: 'g-5',
     requestReference: 'CA-2026-002',
     type: 'Cash Advance',
-    user: 'Robert Finch',
+    user: 'Finance & Account',
     role: UserRole.FINANCE_OFFICER,
     action: 'Processed Payment',
     date: '2026-05-23 16:00',
@@ -274,7 +281,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     id: 'g-6',
     requestReference: 'CA-2026-003',
     type: 'Cash Advance',
-    user: 'Sarah Jenkins',
+    user: 'Tina Ofeno',
     role: UserRole.HEAD_OF_ADMIN,
     action: 'Approved & Released To Finance',
     date: '2026-06-09 16:30',

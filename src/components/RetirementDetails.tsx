@@ -470,14 +470,26 @@ export default function RetirementDetails({
                   </p>
                 </div>
                 
-                <button
-                  id="view-receipt-btn"
-                  onClick={() => alert(`Simulating receipt viewer opening for file: ${retirement.receiptName}`)}
-                  className="mt-3 text-xs font-semibold text-blue-600 hover:text-blue-800 text-left underline"
-                  type="button"
-                >
-                  Verify Barcode receipts
-                </button>
+                {retirement.receiptUrl ? (
+                  <a
+                    id="view-receipt-btn"
+                    href={retirement.receiptUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 text-xs font-semibold text-blue-600 hover:text-blue-800 text-left underline"
+                  >
+                    Verify Barcode receipts
+                  </a>
+                ) : (
+                  <button
+                    id="view-receipt-btn"
+                    onClick={() => alert(`Simulating receipt viewer opening for file: ${retirement.receiptName}`)}
+                    className="mt-3 text-xs font-semibold text-blue-600 hover:text-blue-800 text-left underline"
+                    type="button"
+                  >
+                    Verify Barcode receipts
+                  </button>
+                )}
               </div>
             )}
 

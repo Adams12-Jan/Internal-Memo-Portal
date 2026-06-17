@@ -24,6 +24,7 @@ import {
   SystemCustomSettings
 } from './types';
 
+import authService, { AuthUser } from './services/authClient';
 import { 
   getStoredData, 
   saveStoredData, 
@@ -48,7 +49,7 @@ import RetirementDetails from './components/RetirementDetails';
 import Reports from './components/Reports';
 import AuditTrail from './components/AuditTrail';
 import NotificationBell from './components/NotificationBell';
-import LoginPortal from './components/LoginPortal';
+import ModernAuth from './components/ModernAuth';
 import CrmPortal from './components/CrmPortal';
 
 export default function App() {
@@ -64,11 +65,18 @@ export default function App() {
   const [sentEmails, setSentEmails] = useState<SentEmail[]>([]);
   const [staffMembers, setStaffMembers] = useState<{ name: string; role: UserRole; department: string }[]>([]);
 
-  // Simulation controls
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // Simulation and authentication controls
+  const [authUser, setAuthUser] = useState<AuthUser | null>(() => authService.getUser());
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => authService.isAuthenticated());
   const [activeUserIdx, setActiveUserIdx] = useState(() => parseInt(localStorage.getItem('ca_session_user_idx') || '0'));
-  
-  const currentUser = staffMembers[activeUserIdx] || staffMembers[0] || { name: 'John Doe', role: UserRole.ADMIN_OFFICER, department: 'Administration' };
+
+  const authUserRole = authUser && Object.values(UserRole).includes(authUser.role as UserRole)
+    ? (authUser.role as UserRole)
+    : UserRole.ADMIN_OFFICER;
+
+  const currentUser = authUser
+    ? { name: `${authUser.first_name} ${authUser.last_name}`, role: authUserRole, department: authUser.department || 'Administration', avatar: authUser.profile_picture_url }
+    : { name: staffMembers[activeUserIdx]?.name || 'Ovat Daniel', role: staffMembers[activeUserIdx]?.role || UserRole.ADMIN_OFFICER, department: staffMembers[activeUserIdx]?.department || 'Administration', avatar: undefined };
 
   // CMS System Settings Controller (Full IT admin access)
   const DEFAULT_SYSTEM_SETTINGS: SystemCustomSettings = {
@@ -176,6 +184,12 @@ export default function App() {
   const [selectedRetirementId, setSelectedRetirementId] = useState<string | null>(null);
   const [isInitiatingAdvance, setIsInitiatingAdvance] = useState(false);
   const [isInitiatingRetirement, setIsInitiatingRetirement] = useState(false);
+  const [profileEditOpen, setProfileEditOpen] = useState(false);
+  const [profileFirstName, setProfileFirstName] = useState(authUser?.first_name || '');
+  const [profileLastName, setProfileLastName] = useState(authUser?.last_name || '');
+  const [profileDepartment, setProfileDepartment] = useState(authUser?.department || 'Administration');
+  const [profilePictureUrl, setProfilePictureUrl] = useState(authUser?.profile_picture_url || '');
+  const [profileSaveStatus, setProfileSaveStatus] = useState<string | null>(null);
 
   // Filters within specific lists
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -247,17 +261,20 @@ export default function App() {
     handleSaveData(advances, retirements, nextLogs, notifications);
   };
 
-  const handleLoginSuccess = (index: number) => {
-    const list = staffMembers.length > 0 ? staffMembers : getStoredStaffMembers();
-    if (!list[index]) return;
-    
-    setActiveUserIdx(index);
+  const handleLoginSuccess = (user: AuthUser) => {
+    setAuthUser(user);
     setIsLoggedIn(true);
     localStorage.setItem('ca_session_logged_in', 'true');
-    localStorage.setItem('ca_session_user_idx', String(index));
+    authService.setUser(user);
+    setProfileFirstName(user.first_name);
+    setProfileLastName(user.last_name);
+    setProfileDepartment(user.department || 'Administration');
+    setProfilePictureUrl(user.profile_picture_url || '');
 
-    const userRole = list[index].role;
-    const userName = list[index].name;
+    const userRole = Object.values(UserRole).includes(user.role as UserRole)
+      ? (user.role as UserRole)
+      : UserRole.ADMIN_OFFICER;
+    const userName = `${user.first_name} ${user.last_name}`;
     const timestamp = getTimestampString();
 
     const newLog: AuditLogEntry = {
@@ -268,9 +285,9 @@ export default function App() {
       role: userRole,
       action: 'User Logged In',
       date: timestamp,
-      comment: `Session initialized securely on browser desk by ${userName} (${userRole})`
+      comment: `Session initialized securely by ${userName} (${userRole})`
     };
-    
+
     const data = getStoredData();
     const nextLogs = [newLog, ...(data.logs.length > 0 ? data.logs : logs)];
     setLogs(nextLogs);
@@ -278,9 +295,29 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    authService.logout();
     setIsLoggedIn(false);
+    setAuthUser(null);
     localStorage.setItem('ca_session_logged_in', 'false');
   };
+
+  React.useEffect(() => {
+    async function fetchCurrentUser() {
+      if (authService.isAuthenticated() && !authUser) {
+        try {
+          const user = await authService.getCurrentUser();
+          setAuthUser(user);
+          setIsLoggedIn(true);
+        } catch (error) {
+          authService.logout();
+          setIsLoggedIn(false);
+          setAuthUser(null);
+        }
+      }
+    }
+
+    fetchCurrentUser();
+  }, [authUser]);
 
   const sendEmailNotification = (
     templateId: string, 
@@ -298,7 +335,7 @@ export default function App() {
 
     // 2. Resolve request/retirement record details
     const targetAdv = advances.find(a => a.referenceNumber === refNum || a.id === refNum);
-    const staffName = targetAdv ? targetAdv.staffName : (extraFields?.staffName || "John Doe");
+    const staffName = targetAdv ? targetAdv.staffName : (extraFields?.staffName || "Ovat Daniel");
     const department = targetAdv ? targetAdv.department : (extraFields?.department || "Administration");
     const purpose = targetAdv ? targetAdv.purpose : (extraFields?.purpose || "Operations funding support");
     const amountRequested = targetAdv ? String(targetAdv.amountRequested) : (extraFields?.amountRequested || "0");
@@ -351,16 +388,16 @@ export default function App() {
     let rRole = "Filer / Initiator";
     
     if (templateId === 'cash_advance_submitted') {
-      const hoAdmin = (staffMembers.length > 0 ? staffMembers : getStoredStaffMembers()).find(s => s.role === UserRole.HEAD_OF_ADMIN);
-      rName = hoAdmin ? hoAdmin.name : "Sarah Jenkins";
+      const hoAdmin = (staffMembers.length > 0 ? staffMembers : getStoredStaffMembers()).find((s: { name: string; role: UserRole; department: string }) => s.role === UserRole.HEAD_OF_ADMIN);
+      rName = hoAdmin ? hoAdmin.name : "Tina Ofeno";
       rRole = UserRole.HEAD_OF_ADMIN;
     } else if (templateId === 'cash_advance_reminder') {
-      const fin = (staffMembers.length > 0 ? staffMembers : getStoredStaffMembers()).find(s => s.role === UserRole.FINANCE_OFFICER);
-      rName = fin ? fin.name : "Robert Finch";
+      const fin = (staffMembers.length > 0 ? staffMembers : getStoredStaffMembers()).find((s: { name: string; role: UserRole; department: string }) => s.role === UserRole.FINANCE_OFFICER);
+      rName = fin ? fin.name : "Finance & Account";
       rRole = UserRole.FINANCE_OFFICER;
     } else if (templateId === 'retirement_submitted') {
-      const hoAdmin = (staffMembers.length > 0 ? staffMembers : getStoredStaffMembers()).find(s => s.role === UserRole.HEAD_OF_ADMIN);
-      rName = hoAdmin ? hoAdmin.name : "Sarah Jenkins";
+      const hoAdmin = (staffMembers.length > 0 ? staffMembers : getStoredStaffMembers()).find((s: { name: string; role: UserRole; department: string }) => s.role === UserRole.HEAD_OF_ADMIN);
+      rName = hoAdmin ? hoAdmin.name : "Tina Ofeno";
       rRole = UserRole.HEAD_OF_ADMIN;
     }
 
@@ -396,8 +433,8 @@ export default function App() {
   // Automated member tagging via email copied dispatch
   const checkForAndSendTaggedEmails = (commentText: string, refNum: string) => {
     if (!commentText) return;
-    const roster = staffMembers.length > 0 ? staffMembers : getStoredStaffMembers();
-    roster.forEach(staff => {
+    const roster: { name: string; role: UserRole; department: string }[] = staffMembers.length > 0 ? staffMembers : getStoredStaffMembers();
+    roster.forEach((staff) => {
       if (commentText.includes(`@${staff.name}`)) {
         const timestamp = new Date().toLocaleString();
         const rEmail = staff.name.toLowerCase().replace(/\s+/g, '.') + "@corporate.com";
@@ -514,6 +551,7 @@ export default function App() {
       amountRequested: reqMeta.amountRequested || 0,
       expectedRetirementDate: reqMeta.expectedRetirementDate || '',
       attachmentName: reqMeta.attachmentName,
+      attachmentUrl: reqMeta.attachmentUrl,
       comment: reqMeta.comment,
       currentStatus: reqMeta.currentStatus || RequestStatus.SUBMITTED,
       initiator: currentUser.name,
@@ -1176,12 +1214,7 @@ export default function App() {
   };
 
   if (!isLoggedIn) {
-    return (
-      <LoginPortal
-        onLoginSuccess={handleLoginSuccess}
-        staffList={staffMembers.length > 0 ? staffMembers : getStoredStaffMembers()}
-      />
-    );
+    return <ModernAuth onLoginSuccess={handleLoginSuccess} />;
   }
 
   return (
@@ -1325,28 +1358,26 @@ export default function App() {
         <div className="flex-1 flex flex-col min-h-screen bg-slate-100 min-w-0">
           
           {/* Main Top Header bar */}
-          <header id="app-primary-header" className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 sticky top-0 z-40 print:hidden shadow-xs">
+          <header id="app-primary-header" className="bg-white border-b border-slate-200 h-14 md:h-16 flex items-center justify-between px-4 md:px-6 sticky top-0 z-40 print:hidden shadow-xs">
             
             {/* Left Header Title / Toggle menu */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3">
               <button
                 id="mobile-menu-trigger-btn"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="p-1 px-2.5 text-slate-600 hover:text-blue-700 hover:bg-slate-50 border border-slate-200 rounded lg:hidden transition-all duration-150"
+                className="p-2 text-slate-600 hover:text-blue-700 hover:bg-slate-50 border border-slate-200 rounded lg:hidden transition-all duration-150 active:scale-95"
               >
                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
               
-              <div className="lg:hidden flex items-center gap-2">
-                <div className="h-7 flex items-center justify-center shrink-0">
-                  <img src="https://imgur.com/Om0LsC2.png" alt="Logo" className="h-full object-contain" referrerPolicy="no-referrer" />
-                </div>
-                <h1 className="font-bold text-slate-800 text-xs tracking-tight uppercase leading-none truncate">{systemSettings.customLogoText}</h1>
+              <div className="lg:hidden flex items-center gap-1 flex-1 min-w-0">
+                <div className="h-6 md:h-7 flex items-center justify-center shrink-0">
+                    <img src="https://imgur.com/8PoFnhE.png" alt="Logo" className="h-full object-contain" referrerPolicy="no-referrer" />
               </div>
 
               <div className="hidden lg:flex items-center space-x-2">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest font-mono">Departmental Workspace:</span>
-                <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">
+                <h2 className="text-sm md:text-base font-black text-slate-800 uppercase tracking-tight">
                   {activeTab === 'dashboard' ? 'Overview Operations' :
                    activeTab === 'requests' ? 'Cash Advance Allocation Memo Desk' :
                    activeTab === 'retirement' ? 'Audit Expense & Retirements' :
@@ -1358,7 +1389,7 @@ export default function App() {
             </div>
 
             {/* Right Header Controls */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 md:gap-4">
               
               {/* Live Notifications bell */}
               <NotificationBell
@@ -1375,16 +1406,16 @@ export default function App() {
               <button
                 id="portal-theme-mode-toggle"
                 onClick={() => setIsDarkMode(!isDarkMode)}
-                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 dark:hover:text-white rounded-lg transition-all cursor-pointer flex items-center justify-center border border-slate-200 dark:border-slate-700"
+                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 dark:hover:text-white rounded-lg transition-all cursor-pointer flex items-center justify-center border border-slate-200 dark:border-slate-700 active:scale-95"
                 title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
               >
                 {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
               </button>
 
-              <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
+              <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden md:block"></div>
 
               {/* Profile display widget summary */}
-              <div className="hidden sm:flex items-center gap-2.5">
+              <div className="hidden md:flex items-center gap-2.5">
                 <div className="text-right">
                   <span className="text-xs font-bold block text-slate-800 dark:text-slate-100 leading-none">{currentUser.name}</span>
                   <span className="text-[9px] font-mono font-semibold text-slate-400 block mt-1 uppercase leading-none">{currentUser.role}</span>
@@ -1395,7 +1426,7 @@ export default function App() {
                 <button
                   id="app-header-logout-trigger"
                   onClick={handleLogout}
-                  className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg border border-transparent transition-all cursor-pointer ml-1"
+                  className="p-2 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg border border-transparent transition-all cursor-pointer ml-1 active:scale-95"
                   title="Secure logout session"
                 >
                   <LogOut className="w-4 h-4" />
@@ -1403,15 +1434,16 @@ export default function App() {
               </div>
 
             </div>
+          </div>
           </header>
 
       {/* Mobile responsive slide dropdown Menu */}
       {mobileMenuOpen && (
-        <div id="mobile-navigation-dropdown" className="lg:hidden bg-white border-b border-slate-200 p-4 space-y-2 flex flex-col z-30 sticky top-16 print:hidden">
+        <div id="mobile-navigation-dropdown" className="lg:hidden bg-white border-b border-slate-200 p-3 space-y-1 flex flex-col z-30 sticky top-14 md:top-16 print:hidden">
           <button
             id="mob-tab-dashboard"
             onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); handleSetStatusFilter(null); }}
-            className={`p-2 rounded-lg font-bold text-xs text-left ${activeTab === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'}`}
+            className={`p-3 rounded-lg font-bold text-sm text-left transition-colors active:scale-95 ${activeTab === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'}`}
           >
             Overview Dashboard
           </button>
@@ -1425,21 +1457,21 @@ export default function App() {
           <button
             id="mob-tab-retirement"
             onClick={() => { setActiveTab('retirement'); setSelectedRetirementId(null); setIsInitiatingRetirement(false); setMobileMenuOpen(false); }}
-            className={`p-2 rounded-lg font-bold text-xs text-left ${activeTab === 'retirement' ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'}`}
+            className={`p-3 rounded-lg font-bold text-sm text-left transition-colors active:scale-95 ${activeTab === 'retirement' ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'}`}
           >
             Fund Retirements
           </button>
           <button
             id="mob-tab-reports"
             onClick={() => { setActiveTab('reports'); setMobileMenuOpen(false); }}
-            className={`p-2 rounded-lg font-bold text-xs text-left ${activeTab === 'reports' ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'}`}
+            className={`p-3 rounded-lg font-bold text-sm text-left transition-colors active:scale-95 ${activeTab === 'reports' ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'}`}
           >
             Accounts Ledger
           </button>
           <button
             id="mob-tab-audit"
             onClick={() => { setActiveTab('audit'); setMobileMenuOpen(false); }}
-            className={`p-2 rounded-lg font-bold text-xs text-left ${activeTab === 'audit' ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'}`}
+            className={`p-3 rounded-lg font-bold text-sm text-left transition-colors active:scale-95 ${activeTab === 'audit' ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'}`}
           >
             Audit Trail
           </button>
@@ -1447,7 +1479,7 @@ export default function App() {
           <button
             id="mob-tab-crm"
             onClick={() => { setActiveTab('crm'); setMobileMenuOpen(false); }}
-            className={`p-2 rounded-lg font-bold text-xs text-left ${activeTab === 'crm' ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'}`}
+            className={`p-3 rounded-lg font-bold text-sm text-left transition-colors active:scale-95 ${activeTab === 'crm' ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'}`}
           >
             CRM Email & Directory
           </button>
@@ -1455,20 +1487,28 @@ export default function App() {
           <button
             id="mob-tab-config"
             onClick={() => { setActiveTab('config'); setMobileMenuOpen(false); }}
-            className={`p-2 rounded-lg font-bold text-xs text-left ${activeTab === 'config' ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'}`}
+            className={`p-3 rounded-lg font-bold text-sm text-left transition-colors active:scale-95 ${activeTab === 'config' ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'}`}
           >
             Internal Memo Simulation
           </button>
           
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
-            <span>Logged as: {currentUser.name}</span>
-            <span className="font-mono text-[10px]">{currentUser.role}</span>
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 px-2 py-3 mt-2">
+            <div>
+              <span className="block font-bold text-slate-700">{currentUser.name}</span>
+              <span className="font-mono text-[10px] text-slate-400">{currentUser.role}</span>
+            </div>
+            <button
+              onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+              className="text-red-600 hover:text-red-700 font-bold text-xs px-3 py-2 rounded hover:bg-red-50 transition-colors active:scale-95"
+            >
+              Sign Out
+            </button>
           </div>
         </div>
       )}
 
           {/* Main Space Container workspace */}
-          <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto">
+          <main className="flex-1 p-3 md:p-4 lg:p-6 overflow-y-auto">
         
         {/* Core switchable Active tabs body container */}
         <div id="active-tab-body">
