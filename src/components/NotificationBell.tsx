@@ -41,7 +41,8 @@ export default function NotificationBell({
     currentRole === UserRole.SYSTEM_ADMIN || n.recipientRole === currentRole || n.recipientRole === 'All'
   );
 
-  const unreadCount = roleNotifications.filter(n => !n.isRead).length;
+  const unreadNotifications = roleNotifications.filter(n => !n.isRead);
+  const unreadCount = unreadNotifications.length;
 
   const handleNotificationClick = (n: NotificationEntry) => {
     onMarkAsRead(n.id);
@@ -55,7 +56,7 @@ export default function NotificationBell({
     { label: "Correction Needed", text: "Please review and fix incorrect retirement receipts or missing invoice vouchers." },
     { label: "Payment Processed", text: "Finance Desk has disbursed matching funds. Check your bank accounts or sign settlement receipt." },
     { label: "Compliance Issue", text: "Internal Control flagged expenditures discrepancy. Please upload additional evidence." },
-    { label: "Budget Review", text: "The Executive Office requires more project justification before approving this fund request." },
+    { label: "Budget Review", text: "The Executive Director requires more project justification before approving this fund request." },
     { label: "General Advisory", text: "Reminder: Cash retirement must occur within 14 days of funds dispersion." }
   ];
 
@@ -133,12 +134,12 @@ export default function NotificationBell({
               )}
               
               <div className="max-h-96 overflow-y-auto divide-y divide-slate-100">
-                {roleNotifications.length === 0 ? (
+                {unreadNotifications.length === 0 ? (
                   <div className="p-8 text-center text-slate-400 text-xs font-medium">
-                    No active feed alerts for role: <span className="font-bold text-slate-500">{currentRole}</span>
+                    No active unread alerts for role: <span className="font-bold text-slate-500">{currentRole}</span>
                   </div>
                 ) : (
-                  roleNotifications.map(notification => (
+                  unreadNotifications.map(notification => (
                     <div
                       id={`notification-item-${notification.id}`}
                       key={notification.id}
@@ -192,11 +193,11 @@ export default function NotificationBell({
                   onChange={(e) => setRecipient(e.target.value as any)}
                   className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 transition-all cursor-pointer"
                 >
-                  <option value={UserRole.ADMIN_OFFICER}>Initiator (Admin Officer)</option>
-                  <option value={UserRole.HEAD_OF_ADMIN}>Head of Administration</option>
+                  <option value={UserRole.ADMIN_OFFICER}>Initiator</option>
+                  <option value={UserRole.HEAD_OF_ADMIN}>Line Manager</option>
                   <option value={UserRole.INTERNAL_CONTROL}>Internal Control Officer</option>
                   <option value={UserRole.FINANCE_OFFICER}>Finance Officer</option>
-                  <option value={UserRole.EXECUTIVE_OFFICE}>Executive Office</option>
+                  <option value={UserRole.EXECUTIVE_DIRECTOR}>Executive Director</option>
                   <option value={UserRole.SYSTEM_ADMIN}>System Administrator</option>
                   <option value="All">All Corporate Staff Roles</option>
                 </select>

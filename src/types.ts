@@ -4,10 +4,10 @@
  */
 
 export enum UserRole {
-  ADMIN_OFFICER = 'Admin Officer',
-  HEAD_OF_ADMIN = 'Head of Administration',
+  ADMIN_OFFICER = 'Initiator',
+  HEAD_OF_ADMIN = 'Line Manager',
   INTERNAL_CONTROL = 'Internal Control Officer',
-  EXECUTIVE_OFFICE = 'Executive Office',
+  EXECUTIVE_DIRECTOR = 'Executive Director',
   FINANCE_OFFICER = 'Finance Officer',
   SYSTEM_ADMIN = 'System Administrator'
 }
@@ -15,10 +15,10 @@ export enum UserRole {
 export enum RequestStatus {
   DRAFT = 'Draft',
   SUBMITTED = 'Submitted',
-  PENDING_HEAD_OF_ADMIN = 'Pending Head of Admin Approval',
+  PENDING_HEAD_OF_ADMIN = 'Pending Line Manager Approval',
   PENDING_INTERNAL_CONTROL = 'Pending Internal Control Approval',
-  PENDING_EXECUTIVE_OFFICE = 'Pending Executive Office Approval',
-  PENDING_HEAD_OF_ADMIN_RELEASE = 'Pending Head of Admin Release to Finance',
+  PENDING_EXECUTIVE_OFFICE = 'Pending Executive Director Approval',
+  PENDING_HEAD_OF_ADMIN_RELEASE = 'Pending Line Manager Release to Finance',
   AWAITING_FINANCE_PAYMENT = 'Awaiting Finance Payment',
   PAID = 'Paid',
   REJECTED = 'Rejected',
@@ -28,10 +28,10 @@ export enum RequestStatus {
 export enum RetirementStatus {
   DRAFT = 'Draft',
   SUBMITTED = 'Submitted',
-  PENDING_HEAD_OF_ADMIN = 'Pending Head of Admin Approve/Verify',
+  PENDING_HEAD_OF_ADMIN = 'Pending Line Manager Approve/Verify',
   PENDING_INTERNAL_CONTROL = 'Pending Internal Control Compliance',
-  PENDING_EXECUTIVE_OFFICE = 'Pending Executive Office Clearance',
-  PENDING_HEAD_OF_ADMIN_RELEASE = 'Pending Release to Finance',
+  PENDING_EXECUTIVE_OFFICE = 'Pending Executive Director Clearance',
+  PENDING_HEAD_OF_ADMIN_RELEASE = 'Pending Line Manager Release to Finance',
   PENDING_FINANCE = 'Pending Finance Reconciliation',
   APPROVED = 'Approved & Closed',
   REJECTED = 'Retirement Rejected'
@@ -130,16 +130,25 @@ export const DEPARTMENTS = [
   'Operations',
   'Human Resources',
   'Internal Audit & Control',
-  'Executive Office',
+  'Executive Director',
   'Legal & Compliance',
   'IT & Systems'
+];
+
+export const IDENTITIES = [
+  'Initiator',
+  'IT Support',
+  'Line Manager',
+  'Internal Control',
+  'Executive Director',
+  'Finance'
 ];
 
 export const STAFF_MEMBERS: { name: string; role: UserRole; department: string }[] = [
   { name: 'Ovat Daniel', role: UserRole.ADMIN_OFFICER, department: 'Administration' },
   { name: 'Tina Ofeno', role: UserRole.HEAD_OF_ADMIN, department: 'Administration' },
   { name: 'Jelili Lamidi', role: UserRole.INTERNAL_CONTROL, department: 'Internal Audit & Control' },
-  { name: 'Oyelade Eigbe', role: UserRole.EXECUTIVE_OFFICE, department: 'Executive Office' },
+  { name: 'Oyelade Eigbe', role: UserRole.EXECUTIVE_DIRECTOR, department: 'Executive Director' },
   { name: 'Finance & Account', role: UserRole.FINANCE_OFFICER, department: 'Finance & Accounts' },
   { name: 'IT Support', role: UserRole.SYSTEM_ADMIN, department: 'IT & Systems' }
 ];
@@ -171,7 +180,12 @@ export interface SystemCustomSettings {
   retirementWindowDays: number;
   requiresExecutiveApprovalAbove: number;
   customLogoText: string;
-  themeAccent: 'default' | 'blue' | 'purple' | 'emerald' | 'crimson' | 'orange';
+  customLogoUrl?: string;
+  customBackgroundUrl?: string;
+  customFrameColor?: string;
+  customTableColor?: string;
+  customIconColor?: string;
+  themeAccent: 'default' | 'blue' | 'purple' | 'emerald' | 'crimson' | 'orange' | 'vetiva';
   borderStyle: 'default' | 'rounded' | 'sharp';
   supportEmail: string;
   supportPhone: string;

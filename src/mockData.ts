@@ -33,7 +33,7 @@ export const INITIAL_CASH_ADVANCES: CashAdvanceRequest[] = [
       { userId: '1', userRole: UserRole.ADMIN_OFFICER, userName: 'Ovat Daniel', action: 'Submit', date: '2026-05-10 09:15', comment: 'Initiated request' },
       { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Approve', date: '2026-05-11 10:30', comment: 'Recommended for approval. Essential items.' },
       { userId: '3', userRole: UserRole.INTERNAL_CONTROL, userName: 'Jelili Lamidi', action: 'Approve', date: '2026-05-11 14:45', comment: 'Verified against budget limit. Complies.' },
-      { userId: '4', userRole: UserRole.EXECUTIVE_OFFICE, userName: 'Oyelaide Eigbe', action: 'Approve', date: '2026-05-12 11:00', comment: 'Exe Office Approved.' },
+      { userId: '4', userRole: UserRole.EXECUTIVE_DIRECTOR, userName: 'Oyelaide Eigbe', action: 'Approve', date: '2026-05-12 11:00', comment: 'Exe Office Approved.' },
       { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina', action: 'Send to Finance', date: '2026-05-12 12:15', comment: 'Sending to Finance for payment.' },
       { userId: '5', userRole: UserRole.FINANCE_OFFICER, userName: 'Finance & Account', action: 'Pay', date: '2026-05-13 15:30', comment: 'Paid successfully via bank transfer.' }
     ],
@@ -63,7 +63,7 @@ export const INITIAL_CASH_ADVANCES: CashAdvanceRequest[] = [
       { userId: '1', userRole: UserRole.ADMIN_OFFICER, userName: 'Ovat Daniel', action: 'Submit', date: '2026-05-20 10:00', comment: 'Travel approved by supervisor.' },
       { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Approve', date: '2026-05-21 09:00', comment: 'Standard travel rate applied.' },
       { userId: '3', userRole: UserRole.INTERNAL_CONTROL, userName: 'Jelili Lamidi', action: 'Approve', date: '2026-05-21 15:30', comment: 'Checked travel ledger. Budget available.' },
-      { userId: '4', userRole: UserRole.EXECUTIVE_OFFICE, userName: 'Oyelaide Eigbe', action: 'Approve', date: '2026-05-22 10:45', comment: 'Approved.' },
+      { userId: '4', userRole: UserRole.EXECUTIVE_DIRECTOR, userName: 'Oyelaide Eigbe', action: 'Approve', date: '2026-05-22 10:45', comment: 'Approved.' },
       { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Send to Finance', date: '2026-05-22 11:30', comment: 'Released.' },
       { userId: '5', userRole: UserRole.FINANCE_OFFICER, userName: 'Finance & Account', action: 'Pay', date: '2026-05-23 16:00', comment: 'Disbursed.' }
     ],
@@ -94,7 +94,7 @@ export const INITIAL_CASH_ADVANCES: CashAdvanceRequest[] = [
       { userId: '1', userRole: UserRole.ADMIN_OFFICER, userName: 'Ovat Daniel', action: 'Submit', date: '2026-06-09 08:30', comment: 'Conference refreshments deposit.' },
       { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Approve', date: '2026-06-09 10:15', comment: 'Approved for budget routing.' },
       { userId: '3', userRole: UserRole.INTERNAL_CONTROL, userName: 'Jelili Lamidi', action: 'Approve', date: '2026-06-09 13:40', comment: 'Budget code ADM-CONF-2026 verified.' },
-      { userId: '4', userRole: UserRole.EXECUTIVE_OFFICE, userName: 'Oyelaide Eigbe', action: 'Approve', date: '2026-06-09 15:50', comment: 'Approved for disbursement.' },
+      { userId: '4', userRole: UserRole.EXECUTIVE_DIRECTOR, userName: 'Oyelaide Eigbe', action: 'Approve', date: '2026-06-09 15:50', comment: 'Approved for disbursement.' },
       { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Approve', date: '2026-06-09 10:15', comment: 'Forwarded to Finance.' },
       { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Finance & Account', action: 'Send to Finance', date: '2026-06-09 16:30', comment: 'Released to finance.' }
     ]
@@ -118,7 +118,7 @@ export const INITIAL_CASH_ADVANCES: CashAdvanceRequest[] = [
       { userId: '1', userRole: UserRole.ADMIN_OFFICER, userName: 'Ovat Daniel', action: 'Submit', date: '2026-06-06 09:00', comment: 'Emergency plumber hire.' },
       { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Approve', date: '2026-06-06 09:30', comment: 'Highly urgent.' },
       { userId: '3', userRole: UserRole.INTERNAL_CONTROL, userName: 'Jelili Lamidi', action: 'Approve', date: '2026-06-06 10:00', comment: 'Special budget earmark.' },
-      { userId: '4', userRole: UserRole.EXECUTIVE_OFFICE, userName: 'Oyelaide Eigbe', action: 'Approve', date: '2026-06-06 11:00', comment: 'Approved immediately.' },
+      { userId: '4', userRole: UserRole.EXECUTIVE_DIRECTOR, userName: 'Oyelaide Eigbe', action: 'Approve', date: '2026-06-06 11:00', comment: 'Approved immediately.' },
       { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Send to Finance', date: '2026-06-06 11:15', comment: 'Forwarded to Finance with high-priority flag.' }
     ]
   },
@@ -137,7 +137,7 @@ export const INITIAL_CASH_ADVANCES: CashAdvanceRequest[] = [
     currentStatus: RequestStatus.PENDING_INTERNAL_CONTROL,
     initiator: 'Tina Ofeno',
     approvalHistory: [
-      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Submit', date: '2026-06-11 11:00', comment: 'Initiated as Head of Admin & user.' },
+      { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Submit', date: '2026-06-11 11:00', comment: 'Initiated as Line Manager & user.' },
       { userId: '2', userRole: UserRole.HEAD_OF_ADMIN, userName: 'Tina Ofeno', action: 'Approve', date: '2026-06-11 11:01', comment: 'Self-approved at initial level.' }
     ]
   },
@@ -208,7 +208,7 @@ export const INITIAL_NOTIFICATIONS: NotificationEntry[] = [
   },
   {
     id: 'nt-3',
-    recipientRole: UserRole.EXECUTIVE_OFFICE,
+    recipientRole: UserRole.EXECUTIVE_DIRECTOR,
     text: 'ESCALATION: Payment request CA-2026-004 has remained unpaid for 6 days. Highly critical plumber works repair.',
     date: '2026-06-11 08:01',
     isRead: false,
@@ -289,17 +289,22 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
   }
 ];
 
-export function getStoredData() {
-  const advances = localStorage.getItem('ca_advances');
-  const retirements = localStorage.getItem('ca_retirements');
-  const logs = localStorage.getItem('ca_audit_logs');
-  const notifications = localStorage.getItem('ca_notifications');
+function getUserKey(baseKey: string, userId?: string): string {
+  if (!userId) return baseKey;
+  return `${baseKey}_user_${userId}`;
+}
+
+export function getStoredData(userId?: string) {
+  const advances = localStorage.getItem(getUserKey('ca_advances', userId));
+  const retirements = localStorage.getItem(getUserKey('ca_retirements', userId));
+  const logs = localStorage.getItem(getUserKey('ca_audit_logs', userId));
+  const notifications = localStorage.getItem(getUserKey('ca_notifications', userId));
 
   return {
-    advances: advances ? JSON.parse(advances) : INITIAL_CASH_ADVANCES,
-    retirements: retirements ? JSON.parse(retirements) : INITIAL_RETIREMENTS,
-    logs: logs ? JSON.parse(logs) : INITIAL_AUDIT_LOGS,
-    notifications: notifications ? JSON.parse(notifications) : INITIAL_NOTIFICATIONS
+    advances: advances ? JSON.parse(advances) : [],
+    retirements: retirements ? JSON.parse(retirements) : [],
+    logs: logs ? JSON.parse(logs) : [],
+    notifications: notifications ? JSON.parse(notifications) : []
   };
 }
 
@@ -308,11 +313,26 @@ export function saveStoredData(data: {
   retirements?: CashAdvanceRetirement[];
   logs?: AuditLogEntry[];
   notifications?: NotificationEntry[];
-}) {
-  if (data.advances) localStorage.setItem('ca_advances', JSON.stringify(data.advances));
-  if (data.retirements) localStorage.setItem('ca_retirements', JSON.stringify(data.retirements));
-  if (data.logs) localStorage.setItem('ca_audit_logs', JSON.stringify(data.logs));
-  if (data.notifications) localStorage.setItem('ca_notifications', JSON.stringify(data.notifications));
+}, userId?: string) {
+  if ('advances' in data) {
+    localStorage.setItem(getUserKey('ca_advances', userId), JSON.stringify(data.advances || []));
+  }
+  if ('retirements' in data) {
+    localStorage.setItem(getUserKey('ca_retirements', userId), JSON.stringify(data.retirements || []));
+  }
+  if ('logs' in data) {
+    localStorage.setItem(getUserKey('ca_audit_logs', userId), JSON.stringify(data.logs || []));
+  }
+  if ('notifications' in data) {
+    localStorage.setItem(getUserKey('ca_notifications', userId), JSON.stringify(data.notifications || []));
+  }
+}
+
+export function clearUserData(userId: string) {
+  localStorage.removeItem(getUserKey('ca_advances', userId));
+  localStorage.removeItem(getUserKey('ca_retirements', userId));
+  localStorage.removeItem(getUserKey('ca_audit_logs', userId));
+  localStorage.removeItem(getUserKey('ca_notifications', userId));
 }
 
 export function generateRefId(existing: string[]): string {

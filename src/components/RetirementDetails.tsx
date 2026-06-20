@@ -124,7 +124,7 @@ export default function RetirementDetails({
       case RetirementStatus.PENDING_INTERNAL_CONTROL:
         return currentRole === UserRole.INTERNAL_CONTROL || currentRole === UserRole.SYSTEM_ADMIN;
       case RetirementStatus.PENDING_EXECUTIVE_OFFICE:
-        return currentRole === UserRole.EXECUTIVE_OFFICE || currentRole === UserRole.SYSTEM_ADMIN;
+        return currentRole === UserRole.EXECUTIVE_DIRECTOR || currentRole === UserRole.SYSTEM_ADMIN;
       case RetirementStatus.PENDING_HEAD_OF_ADMIN_RELEASE:
         return currentRole === UserRole.HEAD_OF_ADMIN || currentRole === UserRole.SYSTEM_ADMIN;
       case RetirementStatus.PENDING_FINANCE:
@@ -306,12 +306,11 @@ export default function RetirementDetails({
   };
 
   const stepperSteps = [
-    { name: '1. Initiated', role: 'Initiator' },
-    { name: '2. Audited', role: 'Head of Admin' },
-    { name: '3. Compliance', role: 'Internal Control' },
-    { name: '4. Signed', role: 'Executive Off.' },
-    { name: '5. Released', role: 'Head of Admin' },
-    { name: '6. Reconciled', role: 'Finance Officer' }
+    { name: 'Initiator submitted retirement', role: 'Initiator' },
+    { name: 'Internal Control review', role: 'Internal Control' },
+    { name: 'Executive Manager clearance', role: 'Executive Director' },
+    { name: 'Release to Finance', role: 'Line Manager' },
+    { name: 'Finance reconciliation', role: 'Finance Officer' }
   ];
 
   return (
@@ -405,7 +404,6 @@ export default function RetirementDetails({
                       <p className={`text-xs font-bold mt-2 ${isActive ? 'text-amber-700' : isCompleted ? 'text-emerald-700 font-semibold' : 'text-slate-400'}`}>
                         {step.name}
                       </p>
-                      <p className="text-[10px] text-slate-400 mt-0.5 tracking-wider uppercase font-mono">{step.role}</p>
                     </div>
                   );
                 })}
@@ -504,34 +502,49 @@ export default function RetirementDetails({
           <div className="space-y-3">
             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Auden logs and Signatures</h4>
             <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-              {retirement.approvalHistory.map((item, index) => (
-                <div key={index} className="relative pl-4 border-l border-slate-200 last:border-0 pb-1">
-                  <div className="absolute left-0 top-1 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-slate-300"></div>
-                  <div className="text-xs">
-                    <p className="font-semibold text-slate-800">{item.action} by {item.userName}</p>
-                    <span className="text-[10px] text-slate-400 font-mono">{item.date} • {item.userRole}</span>
-                    {item.comment && (
-                      <p className="mt-1 p-1 bg-white text-slate-500 rounded border border-slate-100/80 text-[10px] leading-relaxed break-words">
-                        {item.comment}
-                      </p>
-                    )}
-                    {item.signatureSvg && (
-                      <div className="mt-1 flex items-center gap-1 select-none">
-                        {item.signatureSvg.startsWith('drawn:') ? (
-                          <img src={item.signatureSvg.substring(6)} className="h-6 max-h-8 max-w-[110px] object-contain border-b border-dashed border-blue-300 bg-blue-50/10 px-1 py-0.2 rounded" alt="Signature" referrerPolicy="no-referrer" />
-                        ) : (
-                          <span className="font-serif italic text-[11px] text-blue-600 border-b border-dashed border-blue-300 font-bold px-1.5 py-0.2 bg-blue-50/10 rounded tracking-wider">
-                            {item.signatureSvg.substring(6)}
-                          </span>
-                        )}
-                        <span className="text-[7px] text-emerald-700 font-extrabold bg-emerald-50 dark:bg-emerald-950/20 px-1 py-0.2 rounded border border-emerald-100 dark:border-emerald-900/40 shrink-0">
-                          🔒 DIGITAL STAMP
-                        </span>
+              {retirement.approvalHistory.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">No approval records available.</p>
+              ) : (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-12 gap-2 px-3 py-2 text-[10px] uppercase tracking-wider font-bold text-slate-500 bg-slate-100 rounded-lg">
+                    <span className="col-span-4">Approver</span>
+                    <span className="col-span-4">Signature</span>
+                    <span className="col-span-4">Date / Time</span>
+                  </div>
+                  <div className="space-y-2">
+                    {retirement.approvalHistory.map((item, index) => (
+                      <div key={index} className="grid grid-cols-12 gap-2 p-3 bg-white border border-slate-200 rounded-xl">
+                        <div className="col-span-4">
+                          <div className="font-semibold text-slate-800">{item.userName}</div>
+                          <div className="text-[10px] text-slate-400">{item.userRole}</div>
+                          <div className="mt-1 text-[10px] text-slate-500">{item.action}</div>
+                        </div>
+                        <div className="col-span-4">
+                          {item.signatureSvg ? (
+                            item.signatureSvg.startsWith('drawn:') ? (
+                              <img src={item.signatureSvg.substring(6)} className="h-10 max-h-12 max-w-full object-contain border-b border-dashed border-blue-300 bg-blue-50/20 px-1 py-0.5 rounded" alt="Signature" referrerPolicy="no-referrer" />
+                            ) : (
+                              <span className="font-serif italic text-xs text-blue-600 border-b border-dashed border-blue-300 font-bold px-2 py-1 bg-blue-50/20 rounded tracking-wider block">
+                                {item.signatureSvg.substring(6)}
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic">No signature recorded</span>
+                          )}
+                        </div>
+                        <div className="col-span-4">
+                          <div className="font-semibold text-slate-800">{item.date}</div>
+                          {item.comment && (
+                            <p className="mt-1 text-[11px] text-slate-600 bg-slate-50 p-2 rounded border border-slate-100 leading-relaxed">
+                              {item.comment}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    )}
+                    ))}
                   </div>
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
@@ -652,7 +665,7 @@ export default function RetirementDetails({
                     onClick={() => handleAction('Return to Admin')}
                     className="w-full bg-amber-50 text-amber-700 hover:bg-amber-100 font-semibold py-2 rounded text-xs transition-colors border border-amber-100 flex items-center justify-center gap-1 cursor-pointer"
                   >
-                    <RotateCcw className="w-4 h-4" /> Return to Head of Admin Release
+                    <RotateCcw className="w-4 h-4" /> Return to Line Manager Release
                   </button>
                 )}
 

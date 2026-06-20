@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   FileText, Clock, CheckCircle2, XCircle, CreditCard, Banknote, 
   HelpCircle, Archive, AlertCircle, ArrowUpRight, ShieldAlert,
@@ -25,8 +25,15 @@ export default function Dashboard({
   onSelectRequest,
   currentUser = { name: 'Employee', role: currentRole, department: 'Operations' }
 }: DashboardProps) {
-  const currentDateStr = '2026-06-12'; // simulated current system date relative to context metadata
-  const currentDate = new Date(currentDateStr);
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  useEffect(() => {
+    const tick = () => setCurrentDate(new Date());
+    const interval = window.setInterval(tick, 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const currentDateStr = currentDate.toISOString().replace('T', ' ').slice(0, 19);
 
   // Helper lists & status groups
   const totalCount = advances.length;
@@ -37,7 +44,7 @@ export default function Dashboard({
       RequestStatus.PENDING_HEAD_OF_ADMIN,
       RequestStatus.PENDING_INTERNAL_CONTROL,
       RequestStatus.PENDING_EXECUTIVE_OFFICE,
-      RequestStatus.PENDING_HEAD_OF_ADMIN_RELEASE
+      RequestStatus.PENDING_HEAD_OF_ADMIN_RELEASE,
     ].includes(a.currentStatus)
   ).length;
 
@@ -106,30 +113,30 @@ export default function Dashboard({
           title: "Initiator Next Actions",
           list: [
             "Submit draft requests or edit and resubmit requests marked as Rejected.",
-            "Once cash advance is disimbursed (Paid), carry out the procurement action.",
+            "Once cash advance is disbursed (Paid), carry out the procurement action.",
             "Gather receipts & expense details, then submit a Retirement Claim within expected dates."
           ]
         };
       case UserRole.HEAD_OF_ADMIN:
         return {
-          title: "Head of Admin Active Queue",
+          title: "Line Manager Active Queue",
           list: [
             "Review submitted initial Cash Advances needing authorization.",
-            "Perform Final action on Executive Office approved requests: click [Send To Finance] to queue payment.",
+              "Perform Final action on Executive Director approved requests: click [Send To Finance] to queue payment.",
             "Verify submitted employee Cash Advance Retirement claims against invoice slips."
           ]
         };
       case UserRole.INTERNAL_CONTROL:
         return {
-          title: "Internal Control Compliance Queue",
+          title: "Internal Control Desk Actions",
           list: [
             "Check budget items, limits, and departments for pending cash advance requests.",
             "Audit expense receipts and returned balances for retiring fund folders."
           ]
         };
-      case UserRole.EXECUTIVE_OFFICE:
+      case UserRole.EXECUTIVE_DIRECTOR:
         return {
-          title: "Executive Director Desk Actions",
+          title: "Executive Manager Desk Actions",
           list: [
             "Provide high-level release approval on major cash disbursements.",
             "Track operational metrics, outstanding and overdue staff retirements."
@@ -145,7 +152,7 @@ export default function Dashboard({
         };
       default:
         return {
-          title: "System Admin Operations Desk",
+          title: "System Administrator Actions",
           list: [
             "Change roles and run end-to-end sandbox simulations of the approval cycle.",
             "View real-time audit log files to ensure transparency across all operational metrics."
@@ -156,11 +163,19 @@ export default function Dashboard({
 
   const actionBox = getRoleActions();
 
+  const recentWorkflowEntries = advances
+    .flatMap((advance) => advance.approvalHistory.map((entry) => ({
+      ...entry,
+      referenceNumber: advance.referenceNumber,
+    })))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5);
+
   // Urgent pending requests specifically matching currently selected role
   const getAwaitingRoleFilter = (a: CashAdvanceRequest) => {
     if (a.currentStatus === RequestStatus.PENDING_HEAD_OF_ADMIN && currentRole === UserRole.HEAD_OF_ADMIN) return true;
     if (a.currentStatus === RequestStatus.PENDING_INTERNAL_CONTROL && currentRole === UserRole.INTERNAL_CONTROL) return true;
-    if (a.currentStatus === RequestStatus.PENDING_EXECUTIVE_OFFICE && currentRole === UserRole.EXECUTIVE_OFFICE) return true;
+    if (a.currentStatus === RequestStatus.PENDING_EXECUTIVE_OFFICE && currentRole === UserRole.EXECUTIVE_DIRECTOR) return true;
     if (a.currentStatus === RequestStatus.PENDING_HEAD_OF_ADMIN_RELEASE && currentRole === UserRole.HEAD_OF_ADMIN) return true;
     if (a.currentStatus === RequestStatus.AWAITING_FINANCE_PAYMENT && currentRole === UserRole.FINANCE_OFFICER) return true;
     return false;
@@ -172,6 +187,8 @@ export default function Dashboard({
   const getAwaitingRoleRetirement = (r: CashAdvanceRetirement) => {
     if (r.currentStatus === RetirementStatus.PENDING_HEAD_OF_ADMIN && currentRole === UserRole.HEAD_OF_ADMIN) return true;
     if (r.currentStatus === RetirementStatus.PENDING_INTERNAL_CONTROL && currentRole === UserRole.INTERNAL_CONTROL) return true;
+    if (r.currentStatus === RetirementStatus.PENDING_EXECUTIVE_OFFICE && currentRole === UserRole.EXECUTIVE_DIRECTOR) return true;
+    if (r.currentStatus === RetirementStatus.PENDING_HEAD_OF_ADMIN_RELEASE && currentRole === UserRole.HEAD_OF_ADMIN) return true;
     if (r.currentStatus === RetirementStatus.PENDING_FINANCE && currentRole === UserRole.FINANCE_OFFICER) return true;
     return false;
   };
@@ -185,21 +202,21 @@ export default function Dashboard({
   return (
     <div id="dashboard-container" className="space-y-8 animate-fade-in">
       {/* Welcome Banner */}
-      <div id="dashboard-banner" className="bg-gradient-to-r from-blue-700 to-indigo-800 rounded-2xl p-6 text-white shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
+      <div id="dashboard-banner" className="bg-[#A68D63] rounded-2xl p-4 sm:p-6 text-white shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="w-full">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
-            <span className="text-xs font-mono uppercase tracking-widest text-blue-200">Corporate Portal System</span>
+            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white animate-pulse" />
+            <span className="text-[10px] sm:text-xs font-mono uppercase tracking-widest text-white/80">Internal Memo Portal</span>
           </div>
-          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight mt-1">Admin Memo & Cash Advance Management</h2>
-          <p className="text-sm text-blue-100/90 mt-1.5 font-sans max-w-2xl">
-            Welcome back! You are logged in as <span className="font-semibold text-white underline decoration-amber-400 decoration-2">{currentRole}</span>. Track cash advance requests, verify retirement records, and approve vouchers.
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight mt-1">Internal Memo & Cash Advance Management</h2>
+          <p className="text-xs sm:text-sm text-white/90 mt-1.5 font-sans max-w-2xl">
+            Welcome back! You are logged in as <span className="font-semibold text-white underline decoration-white/40 decoration-2">{currentRole}</span>. Track cash advance requests, verify retirement records, and approve vouchers.
           </p>
         </div>
-        <div className="bg-white/10 backdrop-blur-md rounded-xl py-2 px-4 border border-white/10 shrink-0">
-          <p className="text-xs font-mono text-blue-200 uppercase">Current Business Date</p>
-          <p className="text-lg font-bold font-mono text-amber-300">2026-06-12 UT</p>
-        </div>
+        <div className="bg-[#A68D63]/12 backdrop-blur-md rounded-xl py-2 px-3 sm:px-4 border border-[#A68D63] shrink-0 self-start sm:self-auto">
+            <p className="text-[9px] sm:text-xs font-mono text-white/70 uppercase">Current Business Date</p>
+            <p className="text-base sm:text-lg font-bold font-mono text-white">{currentDateStr} UTC</p>
+          </div>
       </div>
 
       {/* Dynamic Role-Specific Approval Dashboards */}
@@ -212,10 +229,10 @@ export default function Dashboard({
           <div className="space-y-4">
             <div className="p-4 bg-purple-50 rounded-xl border border-purple-100 flex flex-col md:flex-row justify-between gap-4">
               <div>
-                <span className="text-[10px] bg-purple-200 text-purple-800 px-2 py-0.5 rounded font-bold uppercase tracking-wider">HOA Executive Oversight</span>
-                <h4 className="text-lg font-bold text-purple-950 mt-1">Head of Administration Dashboard</h4>
+                <span className="text-[10px] bg-purple-200 text-purple-800 px-2 py-0.5 rounded font-bold uppercase tracking-wider">Line Manager Executive Oversight</span>
+                <h4 className="text-lg font-bold text-purple-950 mt-1">Line Manager Dashboard</h4>
                 <p className="text-xs text-purple-850 mt-1 max-w-2xl leading-relaxed">
-                  As Head of Administration, you oversee standard budgetary validations and final release authorizations. You have authority to review initial requests and transition approved executive office funds to the finance room.
+                  As Line Manager, you oversee standard budgetary validations and final release authorizations. You have authority to review initial requests and transition approved Executive Director funds to the finance room.
                 </p>
               </div>
               <div className="flex gap-2 shrink-0 items-center">
@@ -244,7 +261,7 @@ export default function Dashboard({
                 <p className="text-slate-600 mt-1">Cross-audit all physical invoices with retirement claim forms before sending them to the finance desk.</p>
               </div>
               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 text-xs">
-                <span className="font-bold text-slate-700 block">HOA Portal Quick Jump</span>
+                <span className="font-bold text-slate-700 block">Line Manager Portal Quick Jump</span>
                 <div className="mt-2 flex gap-2">
                   <button onClick={() => handleMetricClick(RequestStatus.PENDING_HEAD_OF_ADMIN)} className="px-2 py-1 bg-purple-600 text-white font-bold rounded text-[10px] hover:bg-purple-700 transition cursor-pointer">Open Initial Queue</button>
                   <button onClick={() => handleMetricClick(RequestStatus.PENDING_HEAD_OF_ADMIN_RELEASE)} className="px-2 py-1 bg-indigo-600 text-white font-bold rounded text-[10px] hover:bg-indigo-700 transition cursor-pointer">Open Release Queue</button>
@@ -258,15 +275,15 @@ export default function Dashboard({
           <div className="space-y-4">
             <div className="p-4 bg-violet-50 rounded-xl border border-violet-100 flex flex-col md:flex-row justify-between gap-4">
               <div>
-                <span className="text-[10px] bg-violet-200 text-violet-800 px-2 py-0.5 rounded font-bold uppercase tracking-wider">Compliance Registry</span>
-                <h4 className="text-lg font-bold text-violet-950 mt-1">Internal Control & Compliance Dashboard</h4>
+                <span className="text-[10px] bg-violet-200 text-violet-800 px-2 py-0.5 rounded font-bold uppercase tracking-wider">Internal Control Registry</span>
+                <h4 className="text-lg font-bold text-violet-950 mt-1">Internal Control Dashboard</h4>
                 <p className="text-xs text-violet-850 mt-1 max-w-2xl leading-relaxed">
                   Validate correct general ledger coding, regulatory alignment, and budget limits. All claims are audited by your desk to eliminate unauthorized expenses.
                 </p>
               </div>
               <div className="flex gap-2 shrink-0 items-center">
                 <div className="bg-white px-3 py-2 rounded-lg border border-violet-100 text-center min-w-[100px]">
-                  <span className="text-[10px] text-slate-500 font-mono block">Pending Audits</span>
+                  <span className="text-[10px] text-slate-500 font-mono block">Pending Approvals</span>
                   <span className="text-xl font-extrabold text-violet-900 font-mono">
                     {advances.filter(a => a.currentStatus === RequestStatus.PENDING_INTERNAL_CONTROL).length}
                   </span>
@@ -282,7 +299,7 @@ export default function Dashboard({
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 text-xs">
-                <span className="font-bold text-slate-700 block">Compliance Threshold Monitor</span>
+                <span className="font-bold text-slate-700 block">Internal Control Threshold Monitor</span>
                 <p className="text-slate-600 mt-1">Enforce statutory ratios. High-value requests automatically suggest extra executive checkoffs.</p>
               </div>
               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 text-xs">
@@ -299,7 +316,7 @@ export default function Dashboard({
           </div>
         )}
 
-        {currentRole === UserRole.EXECUTIVE_OFFICE && (
+        {currentRole === UserRole.EXECUTIVE_DIRECTOR && (
           <div className="space-y-4">
             <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 flex flex-col md:flex-row justify-between gap-4">
               <div>
@@ -393,10 +410,10 @@ export default function Dashboard({
           <div className="space-y-4">
             <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 flex flex-col md:flex-row justify-between gap-4">
               <div>
-                <span className="text-[10px] bg-blue-200 text-blue-800 px-2 py-0.5 rounded font-bold uppercase tracking-wider">Administrative Operations Desk</span>
+                <span className="text-[10px] bg-blue-200 text-blue-800 px-2 py-0.5 rounded font-bold uppercase tracking-wider">Initiator</span>
                 <h4 className="text-lg font-bold text-blue-950 mt-1">Initiator Portal Dashboard ({currentUser.name})</h4>
                 <p className="text-xs text-blue-850 mt-1 max-w-2xl leading-relaxed">
-                  Draft and file departmental cash advance requests. Remember to key in expected retirement deadlines and keep track of compliance deadlines of your outstanding balances.
+                  Draft and file cash advance requests. Remember to key in expected retirement deadlines and keep track of outstanding balances.
                 </p>
               </div>
               <div className="flex gap-2 shrink-0 items-center">
@@ -435,6 +452,76 @@ export default function Dashboard({
             <div className="p-4 bg-slate-900 text-white rounded-xl border border-slate-800 flex flex-col md:flex-row justify-between gap-4">
               <div>
                 <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded font-bold uppercase tracking-wider">Root Operations Desk</span>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Workflow Log History</h4>
+                    <p className="text-[11px] text-slate-500 mt-1">Recent approval activity from active cash advance requests.</p>
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wider text-slate-400">Latest</span>
+                </div>
+                {recentWorkflowEntries.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">No workflow history is available yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {recentWorkflowEntries.map((entry) => (
+                      <div key={`${entry.userId}-${entry.date}-${entry.referenceNumber}`} className="p-3 bg-slate-50 rounded-3xl border border-slate-100">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-slate-800">{entry.userName}</div>
+                            <div className="text-[10px] text-slate-500">{entry.userRole} · {entry.action}</div>
+                          </div>
+                          <div className="text-right text-[10px] text-slate-400">{entry.date}</div>
+                        </div>
+                        <p className="mt-3 text-[11px] text-slate-600">{entry.comment || 'No comment recorded.'}</p>
+                        <p className="mt-2 text-[10px] text-slate-500">Reference: {entry.referenceNumber}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-3 mb-4">
+                  <ShieldAlert className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Approval Center Panel</h4>
+                    <p className="text-[11px] text-slate-500 mt-1">Action summary for role: {currentRole}</p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="rounded-3xl bg-slate-50 border border-slate-100 p-4">
+                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Role guidance</div>
+                    <div className="mt-3 text-sm font-semibold text-slate-800">{actionBox.title}</div>
+                    <ul className="mt-3 list-disc pl-4 text-[11px] space-y-2 text-slate-600">
+                      {actionBox.list.map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="rounded-3xl bg-slate-50 border border-slate-100 p-4">
+                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Pending approvals</div>
+                    <div className="mt-3 grid gap-2 text-[11px] text-slate-600">
+                      <div className="flex items-center justify-between">
+                        <span>Request items awaiting action</span>
+                        <span className="font-semibold text-slate-800">{urgentRequests.length}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Retirement items awaiting action</span>
+                        <span className="font-semibold text-slate-800">{urgentRetirements.length}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleMetricClick(null)}
+                      className="mt-4 w-full rounded-full bg-blue-600 text-white py-2 text-xs font-bold hover:bg-blue-700 transition"
+                    >
+                      View approval queue
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
                 <h4 className="text-lg font-bold text-slate-100 mt-1">System Administration Control Tower</h4>
                 <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed font-sans">
                   You possess ultimate system clearance. Monitor active audit trails, design mail templates, reset system state matrices or trigger sandbox notifications.
@@ -463,7 +550,7 @@ export default function Dashboard({
               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 text-xs">
                 <span className="font-bold text-slate-700 block">Email Template Portal</span>
                 <p className="text-slate-600 mt-1">Configure and manage automated emails dispatched across dynamic approval thresholds.</p>
-                <button onClick={() => { onSetTab('crm'); }} className="mt-2.5 px-3 py-1 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded text-[10px] transition-colors cursor-pointer">Open Mail Templates</button>
+                <button onClick={() => { onSetTab('cms'); }} className="mt-2.5 px-3 py-1 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded text-[10px] transition-colors cursor-pointer">Open Mail Templates</button>
               </div>
               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 text-xs font-sans">
                 <span className="font-bold text-slate-700 block">Portal Sandbox Control</span>
@@ -839,11 +926,11 @@ export default function Dashboard({
                 Standard Workflow Stepper Logic
               </h5>
               <ol className="mt-2 text-[11px] text-blue-800 list-decimal pl-4 space-y-1 font-sans">
-                <li><strong className="text-slate-800">Admin Officer</strong> drafts & submits memo</li>
-                <li><strong className="text-slate-800">Head of Admin</strong> reviews initial limits</li>
+                <li><strong className="text-slate-800">Initiator</strong> drafts & submits memo</li>
+                <li><strong className="text-slate-800">Line Manager</strong> reviews initial limits</li>
                 <li><strong className="text-slate-800">Internal Control</strong> runs budget check</li>
-                <li><strong className="text-slate-800">Executive Office</strong> provides final release sign-off</li>
-                <li><strong className="text-slate-800">Head of Admin</strong> sends release to Finance</li>
+                    <li><strong className="text-slate-800">Executive Director</strong> provides final release sign-off</li>
+                <li><strong className="text-slate-800">Line Manager</strong> sends release to Finance</li>
                 <li><strong className="text-slate-800">Finance Officer</strong> pays and disburse funds</li>
               </ol>
             </div>

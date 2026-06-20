@@ -1,71 +1,93 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Mail, Lock, AlertCircle, Loader, Eye, EyeOff, Chrome, Building2, ArrowRight } from 'lucide-react';
-import authService, { AuthUser } from '../services/authClient';
+import firebaseAuthService, { AuthUser } from '../services/firebaseAuthService';
+import { IDENTITIES } from '../types';
 
 interface ModernAuthProps {
   onLoginSuccess: (user: AuthUser) => void;
+  customBackgroundUrl?: string;
+  customLogoUrl?: string;
+  customFrameColor?: string;
 }
 
 type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password';
 
-export default function ModernAuth({ onLoginSuccess }: ModernAuthProps) {
-  React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const oauthSuccess = params.get('oauth');
-    const token = params.get('token');
-
-    if (oauthSuccess === 'success' && token) {
-      authService.setToken(token);
-      authService
-        .getCurrentUser()
-        .then((user) => {
-          onLoginSuccess(user);
-          params.delete('oauth');
-          params.delete('token');
-          const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
-          window.history.replaceState(null, '', newUrl);
-        })
-        .catch((error) => {
-          setError(error instanceof Error ? error.message : 'OAuth login failed');
-        });
-    }
-
-    if (oauthSuccess === 'failed') {
-      setError('OAuth login failed. Please try again or use email/password login.');
-      params.delete('oauth');
-      const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
-      window.history.replaceState(null, '', newUrl);
-    }
-  }, [onLoginSuccess]);
-
-  const [oauthEnabled, setOauthEnabled] = React.useState({ google: false, microsoft: false });
-
-  React.useEffect(() => {
-    const apiBase = import.meta.env.VITE_API_URL || '/api';
-    fetch(`${apiBase}/status`)
-      .then((r) => r.json())
-      .then((data) => {
-        setOauthEnabled({ google: !!data.configuredGoogle, microsoft: !!data.configuredMicrosoft });
-      })
-      .catch(() => {
-        // ignore - default to disabled
-      });
-  }, []);
-
+export default function ModernAuth({
+  onLoginSuccess,
+  customBackgroundUrl: customBackgroundUrlProp,
+  customLogoUrl: customLogoUrlProp,
+  customFrameColor: customFrameColorProp
+}: ModernAuthProps) {
   const [mode, setMode] = useState<AuthMode>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [customFrameColor, setCustomFrameColor] = useState(customFrameColorProp?.trim() || '#ffffff');
+  const loginCardStyle: React.CSSProperties = {
+    borderColor: customFrameColor,
+    boxShadow: `0 30px 70px -35px ${customFrameColor}`
+  };
   const [showPassword, setShowPassword] = useState(false);
+  const defaultBackground = 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=1400&h=900&fit=crop';
+  const defaultLogo = 'https://i.imgur.com/8PoFnhE.png';
+  const [customBackgroundUrl, setCustomBackgroundUrl] = useState(customBackgroundUrlProp?.trim() || defaultBackground);
+  const [customBrandLogoUrl, setCustomBrandLogoUrl] = useState(customLogoUrlProp?.trim() || defaultLogo);
+
+  const loadSystemSettings = () => {
+    const raw = localStorage.getItem('ca_system_settings');
+    if (!raw) return;
+    try {
+      const settings = JSON.parse(raw);
+      if (typeof settings.customBackgroundUrl === 'string' && settings.customBackgroundUrl.trim()) {
+        setCustomBackgroundUrl(settings.customBackgroundUrl.trim());
+      }
+      if (typeof settings.customLogoUrl === 'string' && settings.customLogoUrl.trim()) {
+        setCustomBrandLogoUrl(settings.customLogoUrl.trim());
+      }
+        if (typeof settings.customFrameColor === 'string' && settings.customFrameColor.trim()) {
+          setCustomFrameColor(settings.customFrameColor.trim());
+        }
+    } catch {
+      // ignore invalid settings
+    }
+  };
+
+  useEffect(() => {
+    loadSystemSettings();
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === 'ca_system_settings') {
+        loadSystemSettings();
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  useEffect(() => {
+    setCustomFrameColor(customFrameColorProp || '#ffffff');
+  }, [customFrameColorProp]);
+
+  useEffect(() => {
+    setCustomBackgroundUrl(customBackgroundUrlProp?.trim() || defaultBackground);
+  }, [customBackgroundUrlProp]);
+
+  useEffect(() => {
+    setCustomBrandLogoUrl(customLogoUrlProp?.trim() || defaultLogo);
+  }, [customLogoUrlProp]);
 
   // Login form
+  const [loginIdentity, setLoginIdentity] = useState(IDENTITIES[0]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   // Register form
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [department, setDepartment] = useState('Administration');
+  const [identity, setIdentity] = useState(IDENTITIES[0]);
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [profilePicture, setProfilePicture] = useState<File | null>(null);
+  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
 
   // Forgot password
   const [resetEmail, setResetEmail] = useState('');
@@ -79,8 +101,13 @@ export default function ModernAuth({ onLoginSuccess }: ModernAuthProps) {
     setLoading(true);
 
     try {
-      const result = await authService.login(email, password);
-      onLoginSuccess(result.user);
+      const result = await firebaseAuthService.login(email, password);
+      const userWithIdentity = {
+        ...result.user,
+        portal_identity: result.user.portal_identity || loginIdentity
+      };
+      firebaseAuthService.setUser(userWithIdentity);
+      onLoginSuccess(userWithIdentity);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -105,12 +132,38 @@ export default function ModernAuth({ onLoginSuccess }: ModernAuthProps) {
     setLoading(true);
 
     try {
-      const result = await authService.register(email, password, firstName, lastName, department);
+      const result = await firebaseAuthService.register(email, password, firstName, lastName, identity, profilePicture);
       onLoginSuccess(result.user);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Profile picture must be less than 5MB');
+        return;
+      }
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setError('Profile picture must be an image file');
+        return;
+      }
+
+      setProfilePicture(file);
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfilePicturePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -120,11 +173,9 @@ export default function ModernAuth({ onLoginSuccess }: ModernAuthProps) {
     setLoading(true);
 
     try {
-      const data = await authService.requestPasswordReset(resetEmail);
-      if (data?.resetToken) {
-        setError(`Password reset token generated: ${data.resetToken}`);
-      }
+      await firebaseAuthService.requestPasswordReset(resetEmail);
       setMode('reset-password');
+      setError('Check your email for password reset instructions.');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -149,9 +200,10 @@ export default function ModernAuth({ onLoginSuccess }: ModernAuthProps) {
     setLoading(true);
 
     try {
-      await authService.resetPassword(resetToken, newPassword);
+      // Firebase password reset is handled via email link
+      // This is a placeholder message
       setMode('login');
-      setError('Password reset successful. You can now login.');
+      setError('Please use the link in your email to reset your password');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -159,29 +211,26 @@ export default function ModernAuth({ onLoginSuccess }: ModernAuthProps) {
     }
   };
 
-  const handleOAuthLogin = async (provider: string) => {
-    setError('');
-    setLoading(true);
-
-    const apiBase = import.meta.env.VITE_API_URL || '/api';
-    window.location.href = `${apiBase}/auth/${provider.toLowerCase()}`;
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
-      {/* Background accent */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-1/4 right-1/3 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
-      </div>
+    <div
+      className="min-h-screen bg-cover bg-no-repeat flex items-center justify-center p-4"
+      style={{
+        backgroundImage: customBackgroundUrl ? `url("${customBackgroundUrl}")` : undefined,
+        backgroundPosition: 'center center'
+      }}
+    >
+      {/* Overlay for better contrast with purple tint */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#2d0837]/90 via-[#35054f]/85 to-[#1b0427]/95 pointer-events-none"></div>
 
       <div className="w-full max-w-md relative z-10">
-        <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700 rounded-2xl shadow-2xl p-8">
+          <div className="bg-slate-950/50 backdrop-blur-2xl border rounded-2xl p-8" style={loginCardStyle}>
           {/* Header */}
           <div className="text-center mb-8">
             <div className="flex flex-col items-center justify-center gap-3 mb-4">
-              <img src="https://i.imgur.com/8PoFnhE.png" alt="Vetiva Logo" className="h-14 w-auto object-contain" referrerPolicy="no-referrer" />
-              <h1 className="text-2xl md:text-3xl font-bold text-white">Memo Approval Portal</h1>
+              <img src={customBrandLogoUrl} alt="Portal Logo" className="h-14 w-auto object-contain" referrerPolicy="no-referrer" onError={(event) => { (event.currentTarget as HTMLImageElement).src = 'https://i.imgur.com/8PoFnhE.png'; }} />
+              <h1 className="text-2xl md:text-3xl font-bold text-white">
+                {loginIdentity === 'IT Support' ? 'IT Support Portal' : 'Memo Approval Portal'}
+              </h1>
             </div>
           </div>
 
@@ -196,6 +245,19 @@ export default function ModernAuth({ onLoginSuccess }: ModernAuthProps) {
           {/* Login form */}
           {mode === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-200 mb-2">Sign in as</label>
+                <select
+                  value={loginIdentity}
+                  onChange={(e) => setLoginIdentity(e.target.value)}
+                  className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                >
+                  {IDENTITIES.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-200 mb-2">Email Address</label>
                 <div className="relative">
@@ -245,7 +307,7 @@ export default function ModernAuth({ onLoginSuccess }: ModernAuthProps) {
                   </>
                 ) : (
                   <>
-                    Sign In
+                    Sign In as {loginIdentity}
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -259,63 +321,6 @@ export default function ModernAuth({ onLoginSuccess }: ModernAuthProps) {
                 Forgot password?
               </button>
 
-              {(oauthEnabled.google || oauthEnabled.microsoft) && (
-                <div className="mt-4 space-y-3">
-                  <div className="text-center text-xs uppercase tracking-[0.22em] text-slate-500">Or continue with</div>
-                  <div className="grid grid-cols-1 gap-3">
-                    {oauthEnabled.google && (
-                      <button
-                        type="button"
-                        onClick={() => handleOAuthLogin('google')}
-                        className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-800 text-white py-2 text-sm hover:bg-slate-700 transition"
-                      >
-                        <img src="https://imgur.com/8PoFnhE.png" alt="Google" className="h-4 w-4 rounded-full" />
-                        Continue with Google
-                      </button>
-                    )}
-                    {oauthEnabled.microsoft && (
-                      <button
-                        type="button"
-                        onClick={() => handleOAuthLogin('microsoft')}
-                        className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-800 text-white py-2 text-sm hover:bg-slate-700 transition"
-                      >
-                        <span className="h-4 w-4 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-bold">M</span>
-                        Continue with Microsoft
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-600"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-slate-800/50 text-slate-400">Or continue with</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => handleOAuthLogin('Google')}
-                  disabled={!oauthEnabled.google}
-                  title={!oauthEnabled.google ? 'Google OAuth not configured' : 'Continue with Google'}
-                  className={`bg-slate-700/50 ${oauthEnabled.google ? 'hover:bg-slate-700' : 'opacity-50 cursor-not-allowed'} border border-slate-600 rounded-lg py-2 text-white text-sm font-medium transition-all`}
-                >
-                  Google
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleOAuthLogin('Microsoft')}
-                  disabled={!oauthEnabled.microsoft}
-                  title={!oauthEnabled.microsoft ? 'Microsoft OAuth not configured' : 'Continue with Microsoft'}
-                  className={`bg-slate-700/50 ${oauthEnabled.microsoft ? 'hover:bg-slate-700' : 'opacity-50 cursor-not-allowed'} border border-slate-600 rounded-lg py-2 text-white text-sm font-medium transition-all flex items-center justify-center gap-2`}
-                >
-                  Microsoft
-                </button>
-              </div>
 
               <button
                 type="button"
@@ -368,21 +373,35 @@ export default function ModernAuth({ onLoginSuccess }: ModernAuthProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-200 mb-2">Department</label>
+                <label className="block text-sm font-medium text-slate-200 mb-2">Portal Identity</label>
                 <select
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
+                  value={identity}
+                  onChange={(e) => setIdentity(e.target.value)}
                   className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                 >
-                  <option>Administration</option>
-                  <option>Finance & Accounts</option>
-                  <option>Operations</option>
-                  <option>Human Resources</option>
-                  <option>Internal Audit & Control</option>
-                  <option>Executive Office</option>
-                  <option>Legal & Compliance</option>
-                  <option>IT & Systems</option>
+                  {IDENTITIES.map((option) => (
+                    <option key={option}>{option}</option>
+                  ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-200 mb-2">Profile Picture (Optional)</label>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleProfilePictureChange}
+                      className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-2 text-white text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                    />
+                  </div>
+                  {profilePicturePreview && (
+                    <div className="flex-shrink-0">
+                      <img src={profilePicturePreview} alt="Preview" className="h-16 w-16 rounded-full object-cover border border-slate-600" />
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>

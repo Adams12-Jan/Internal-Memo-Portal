@@ -4,11 +4,13 @@ import {
   Users, Trash2, Clock, CheckCircle2, UserPlus, FileCode, Check, 
   ChevronRight, Laptop, Smartphone, HelpCircle, ShieldAlert 
 } from 'lucide-react';
+import { ImagePlus, UploadCloud } from 'lucide-react';
 import { EmailTemplate, SentEmail, UserRole, DEPARTMENTS, SystemCustomSettings } from '../types';
-import crmClient from '../services/crmClient';
+import authClient, { AuthUser } from '../services/authClient';
+import cmsClient from '../services/cmsClient';
 import { Palette, Wrench, ShieldCheck } from 'lucide-react';
 
-interface CrmPortalProps {
+interface CmsPortalProps {
   templates: EmailTemplate[];
   onSaveTemplate: (template: EmailTemplate) => void;
   onResetTemplates: () => void;
@@ -26,7 +28,7 @@ interface CrmPortalProps {
   onPurgeRetirements: () => void;
 }
 
-export default function CrmPortal({
+export default function CmsPortal({
   templates,
   onSaveTemplate,
   onResetTemplates,
@@ -42,9 +44,9 @@ export default function CrmPortal({
   onSaveSystemSettings,
   onPurgeAdvances,
   onPurgeRetirements
-}: CrmPortalProps) {
-  // Sub-tabs: templates, sentLog, directory, utilities, settings
-  const [subTab, setSubTab] = useState<'templates' | 'sentLog' | 'directory' | 'deals' | 'campaigns' | 'utilities' | 'settings'>('templates');
+}: CmsPortalProps) {
+  // Sub-tabs: templates, sentLog, directory, users, utilities, settings
+  const [subTab, setSubTab] = useState<'templates' | 'sentLog' | 'directory' | 'users' | 'deals' | 'campaigns' | 'utilities' | 'settings'>('templates');
   
   // 1. Template States
   const [selectedTemplateId, setSelectedTemplateId] = useState(templates[0]?.id || '');
@@ -69,6 +71,18 @@ export default function CrmPortal({
   const [contactsPageSize, setContactsPageSize] = useState(10);
   const [searchQuery, setSearchQuery] = useState('');
   const [lastSync, setLastSync] = useState<number | null>(null);
+
+  const [users, setUsers] = useState<AuthUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserConfirmPassword, setNewUserConfirmPassword] = useState('');
+  const [newUserFirstName, setNewUserFirstName] = useState('');
+  const [newUserLastName, setNewUserLastName] = useState('');
+  const [newUserRole, setNewUserRole] = useState<UserRole>(UserRole.ADMIN_OFFICER);
+  const [newUserDept, setNewUserDept] = useState('IT & Systems');
+  const [newUserIsActive, setNewUserIsActive] = useState(true);
 
   // 3. Deals state
   const [dealsLoading, setDealsLoading] = useState(false);
@@ -98,6 +112,17 @@ export default function CrmPortal({
   const [cmsSupportEmail, setCmsSupportEmail] = useState(systemSettings.supportEmail);
   const [cmsSupportPhone, setCmsSupportPhone] = useState(systemSettings.supportPhone);
   const [cmsDebugEnabled, setCmsDebugEnabled] = useState(systemSettings.debugBarEnabled);
+  const [cmsLogoUrl, setCmsLogoUrl] = useState(systemSettings.customLogoUrl || '');
+  const [cmsBackgroundUrl, setCmsBackgroundUrl] = useState(systemSettings.customBackgroundUrl || '');
+  const [cmsFrameColor, setCmsFrameColor] = useState(systemSettings.customFrameColor || '#ffffff');
+  const [cmsTableColor, setCmsTableColor] = useState(systemSettings.customTableColor || '#cbd5e1');
+  const [cmsIconColor, setCmsIconColor] = useState(systemSettings.customIconColor || '#6366f1');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
+  const [logoUploadStatus, setLogoUploadStatus] = useState('');
+  const [backgroundUploadStatus, setBackgroundUploadStatus] = useState('');
+  const [logoUploadLoading, setLogoUploadLoading] = useState(false);
+  const [backgroundUploadLoading, setBackgroundUploadLoading] = useState(false);
   const [saveSettingsSuccess, setSaveSettingsSuccess] = useState(false);
 
   useEffect(() => {
@@ -110,6 +135,11 @@ export default function CrmPortal({
     setCmsSupportEmail(systemSettings.supportEmail);
     setCmsSupportPhone(systemSettings.supportPhone);
     setCmsDebugEnabled(systemSettings.debugBarEnabled);
+    setCmsLogoUrl(systemSettings.customLogoUrl || '');
+    setCmsBackgroundUrl(systemSettings.customBackgroundUrl || '');
+    setCmsFrameColor(systemSettings.customFrameColor || '#ffffff');
+    setCmsTableColor(systemSettings.customTableColor || '#cbd5e1');
+    setCmsIconColor(systemSettings.customIconColor || '#6366f1');
   }, [systemSettings]);
 
   // Trigger preview compile when template selection changes
@@ -227,11 +257,11 @@ export default function CrmPortal({
       role: newStaffRole,
       department: newStaffDept
     };
-    // Try to persist to backend CRM, fall back to local update
+    // Try to persist to backend CMS, fall back to local update
     (async () => {
       try {
         const payload = { name: addedMember.name, department: addedMember.department, role: String(addedMember.role) };
-        const created = await crmClient.createContact(payload as any);
+        const created = await cmsClient.createContact(payload as any);
         // map created contact to staff member representation
         const next = [...staffMembers, { name: created.name || addedMember.name, role: addedMember.role, department: created.department || addedMember.department }];
         onUpdateStaffMembers(next);
@@ -253,7 +283,7 @@ export default function CrmPortal({
     setContactsError(null);
     try {
       const offset = page * pageSize;
-      const contacts: any[] = await crmClient.getContacts(pageSize, offset);
+      const contacts: any[] = await cmsClient.getContacts(pageSize, offset);
       // If backend returned an array, map and update staffMembers
       if (Array.isArray(contacts)) {
         const mapped = contacts.map((c: any) => ({ name: c.name || '', role: (c.role as UserRole) || UserRole.ADMIN_OFFICER, department: c.department || 'Administration' }));
@@ -271,7 +301,7 @@ export default function CrmPortal({
     setDealsLoading(true);
     setDealsError(null);
     try {
-      const dealsList: any[] = await crmClient.getDeals(pageSize, offset);
+      const dealsList: any[] = await cmsClient.getDeals(pageSize, offset);
       if (Array.isArray(dealsList)) {
         setDeals(dealsList);
       }
@@ -286,7 +316,7 @@ export default function CrmPortal({
     setCampaignsLoading(true);
     setCampaignsError(null);
     try {
-      const campaignsList: any[] = await crmClient.getCampaigns(pageSize, offset);
+      const campaignsList: any[] = await cmsClient.getCampaigns(pageSize, offset);
       if (Array.isArray(campaignsList)) {
         setCampaigns(campaignsList);
       }
@@ -305,7 +335,7 @@ export default function CrmPortal({
     }
     try {
       const payload = { name: newDealName.trim(), value: Number(newDealValue) || 0, stage: newDealStage };
-      const created = await crmClient.createDeal(payload);
+      const created = await cmsClient.createDeal(payload);
       setDeals([...deals, created]);
       setNewDealName('');
       setNewDealValue('0');
@@ -320,7 +350,7 @@ export default function CrmPortal({
     const deal = deals[index];
     if (confirm(`Delete deal "${deal.name}"?`)) {
       try {
-        await crmClient.deleteDeal(deal.id);
+        await cmsClient.deleteDeal(deal.id);
         setDeals(deals.filter((_, i) => i !== index));
         alert("Deal deleted successfully.");
         fetchDeals();
@@ -338,7 +368,7 @@ export default function CrmPortal({
     }
     try {
       const payload = { name: newCampaignName.trim(), subject: newCampaignSubject, status: newCampaignStatus };
-      const created = await crmClient.createCampaign(payload);
+      const created = await cmsClient.createCampaign(payload);
       setCampaigns([...campaigns, created]);
       setNewCampaignName('');
       setNewCampaignSubject('');
@@ -353,13 +383,126 @@ export default function CrmPortal({
     const campaign = campaigns[index];
     if (confirm(`Delete campaign "${campaign.name}"?`)) {
       try {
-        await crmClient.deleteCampaign(campaign.id);
+        await cmsClient.deleteCampaign(campaign.id);
         setCampaigns(campaigns.filter((_, i) => i !== index));
         alert("Campaign deleted successfully.");
         fetchCampaigns();
       } catch (err) {
         alert(`Error deleting campaign: ${err}`);
       }
+    }
+  };
+
+  const fetchUsers = async () => {
+    setUsersLoading(true);
+    setUsersError(null);
+    try {
+      const userList = await authClient.getUsers();
+      setUsers(userList);
+    } catch (err: any) {
+      setUsersError(String(err?.message || err));
+      setUsers([]);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!newUserEmail.trim() || !newUserFirstName.trim() || !newUserLastName.trim() || !newUserPassword || !newUserConfirmPassword) {
+      alert('Please complete all required fields.');
+      return;
+    }
+
+    if (newUserPassword !== newUserConfirmPassword) {
+      alert('Passwords do not match. Please confirm the new password.');
+      return;
+    }
+
+    try {
+      await authClient.createUser({
+        email: newUserEmail.trim(),
+        password: newUserPassword,
+        firstName: newUserFirstName.trim(),
+        lastName: newUserLastName.trim(),
+        department: newUserDept,
+        role: newUserRole,
+        isActive: newUserIsActive
+      });
+
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setNewUserConfirmPassword('');
+      setNewUserFirstName('');
+      setNewUserLastName('');
+      setNewUserRole(UserRole.ADMIN_OFFICER);
+      setNewUserDept('IT & Systems');
+      setNewUserIsActive(true);
+
+      alert('User account created successfully.');
+      fetchUsers();
+    } catch (err: any) {
+      alert(`Error creating user account: ${err?.message || err}`);
+    }
+  };
+
+  const handleToggleUserActive = async (user: AuthUser) => {
+    const confirmAction = confirm(
+      `Are you sure you want to ${user.is_active ? 'disable' : 'enable'} the account for ${user.email}?`
+    );
+    if (!confirmAction) {
+      return;
+    }
+
+    try {
+      await authClient.updateUser(user.id, { isActive: !user.is_active });
+      fetchUsers();
+      alert(`User account ${user.is_active ? 'disabled' : 'enabled'} successfully.`);
+    } catch (err: any) {
+      alert(`Error updating user status: ${err?.message || err}`);
+    }
+  };
+
+  const handleResetUserPassword = async (user: AuthUser) => {
+    const newPassword = prompt(`Enter a new password for ${user.email}:`, '');
+    if (!newPassword) {
+      return;
+    }
+
+    try {
+      await authClient.updateUser(user.id, { resetPassword: newPassword });
+      alert('Password reset successfully.');
+    } catch (err: any) {
+      alert(`Error resetting password: ${err?.message || err}`);
+    }
+  };
+
+  const handleClearUserProfile = async (user: AuthUser) => {
+    if (!confirm(`Clear profile data for ${user.email}? This will remove name, department, and profile photo links.`)) {
+      return;
+    }
+
+    try {
+      await authClient.clearUserProfile(user.id);
+      fetchUsers();
+      alert('User profile data cleared successfully.');
+    } catch (err: any) {
+      alert(`Error clearing profile data: ${err?.message || err}`);
+    }
+  };
+
+  const handleDeleteUser = async (user: AuthUser) => {
+    if (!confirm(`Permanently delete user account ${user.email}? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await authClient.deleteUser(user.id);
+      setUsers((current) => current.filter((u) => u.id !== user.id));
+      alert('User account deleted successfully.');
+    } catch (err: any) {
+      alert(`Error deleting user account: ${err?.message || err}`);
     }
   };
 
@@ -396,11 +539,11 @@ export default function CrmPortal({
     if (confirm(`Remove "${person.name}" from active staff registers? Dynamic login simulations will clear.`)) {
       (async () => {
         try {
-          // attempt to find contact by name via CRM search and delete first match
-          const contacts = await crmClient.getContacts(50, 0);
+          // attempt to find contact by name via CMS search and delete first match
+          const contacts = await cmsClient.getContacts(50, 0);
           const match = contacts.find((c: any) => String(c.name).toLowerCase() === String(person.name).toLowerCase());
           if (match && match.id) {
-            await crmClient.deleteContact(match.id);
+            await cmsClient.deleteContact(match.id);
             // refresh current page after removal
             setTimeout(() => fetchPageContacts(contactsPage, contactsPageSize, searchQuery), 200);
           }
@@ -414,7 +557,75 @@ export default function CrmPortal({
     }
   };
 
-  // Load CRM contacts when directory tab is active
+  const handleLogoFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setLogoUploadStatus('Only image files are supported for brand logos.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoUploadStatus('Logo file must be smaller than 5MB.');
+      return;
+    }
+    setLogoFile(file);
+    setLogoUploadStatus('Ready to upload logo.');
+  };
+
+  const handleUploadLogo = async () => {
+    if (!logoFile) {
+      setLogoUploadStatus('Choose a logo file first.');
+      return;
+    }
+    setLogoUploadLoading(true);
+    setLogoUploadStatus('Uploading logo...');
+    try {
+      const uploaded = await cmsClient.uploadMedia(logoFile);
+      setCmsLogoUrl(uploaded.fileUrl);
+      setLogoFile(null);
+      setLogoUploadStatus('Logo uploaded successfully. Save settings to apply permanently.');
+    } catch (err: any) {
+      setLogoUploadStatus(`Upload failed: ${err?.message || err}`);
+    } finally {
+      setLogoUploadLoading(false);
+    }
+  };
+
+  const handleBackgroundFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setBackgroundUploadStatus('Only image files are supported for portal background images.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setBackgroundUploadStatus('Background image must be smaller than 10MB.');
+      return;
+    }
+    setBackgroundFile(file);
+    setBackgroundUploadStatus('Ready to upload portal background.');
+  };
+
+  const handleUploadBackground = async () => {
+    if (!backgroundFile) {
+      setBackgroundUploadStatus('Choose a background file first.');
+      return;
+    }
+    setBackgroundUploadLoading(true);
+    setBackgroundUploadStatus('Uploading background image...');
+    try {
+      const uploaded = await cmsClient.uploadMedia(backgroundFile);
+      setCmsBackgroundUrl(uploaded.fileUrl);
+      setBackgroundFile(null);
+      setBackgroundUploadStatus('Background uploaded successfully. Save settings to apply permanently.');
+    } catch (err: any) {
+      setBackgroundUploadStatus(`Upload failed: ${err?.message || err}`);
+    } finally {
+      setBackgroundUploadLoading(false);
+    }
+  };
+
+  // Load CMS contacts when directory tab is active
   useEffect(() => {
     if (subTab !== 'directory') return;
     // Load the current page with optional search
@@ -427,16 +638,22 @@ export default function CrmPortal({
     fetchPageContacts(contactsPage, contactsPageSize, searchQuery);
   }, [contactsPage, contactsPageSize, searchQuery]);
 
-  // Load CRM deals when deals tab is active
+  // Load CMS deals when deals tab is active
   useEffect(() => {
     if (subTab !== 'deals') return;
     fetchDeals();
   }, [subTab]);
 
-  // Load CRM campaigns when campaigns tab is active
+  // Load CMS campaigns when campaigns tab is active
   useEffect(() => {
     if (subTab !== 'campaigns') return;
     fetchCampaigns();
+  }, [subTab]);
+
+  // Load admin users when users tab is active
+  useEffect(() => {
+    if (subTab !== 'users') return;
+    fetchUsers();
   }, [subTab]);
 
   // View modal helper for looking at html outbox logs
@@ -444,13 +661,13 @@ export default function CrmPortal({
   const [viewingEmailSubject, setViewingEmailSubject] = useState<string | null>(null);
 
   return (
-    <div id="crm-portal-workspace" className="max-w-7xl mx-auto space-y-6 animate-fade-in font-sans pb-12">
+    <div id="cms-portal-workspace" className="max-w-7xl mx-auto space-y-6 animate-fade-in font-sans pb-12">
       
       {/* Visual Workspace Banner */}
       <div className="bg-slate-900 border border-slate-800 text-white p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-md shadow-indigo-900/10">
         <div className="space-y-1">
           <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-            <Mail className="w-5.5 h-5.5 text-blue-400" /> CRM & Systems Control Portal
+            <Mail className="w-5.5 h-5.5 text-blue-400" /> CMS & Systems Control Portal
           </h2>
           <p className="text-xs text-slate-400">
             Configure dynamic notifications, modify corporate directory personnel, audit sent outbox mails, and execute scheduler utilities.
@@ -478,6 +695,13 @@ export default function CrmPortal({
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${subTab === 'directory' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
           >
             Corporate Staff ({staffMembers.length})
+          </button>
+          <button 
+            id="subtab-users"
+            onClick={() => setSubTab('users')}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${subTab === 'users' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+          >
+            User Accounts
           </button>
           <button 
             id="subtab-deals"
@@ -761,7 +985,7 @@ export default function CrmPortal({
         </div>
       )}
 
-      {/* SUB-TAB 3: CORPORATE IDENTITY DIRECTORY (STAFF Directory CRM) */}
+      {/* SUB-TAB 3: CORPORATE IDENTITY DIRECTORY (STAFF Directory CMS) */}
       {subTab === 'directory' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
@@ -796,7 +1020,7 @@ export default function CrmPortal({
                   <option value={UserRole.ADMIN_OFFICER}>{UserRole.ADMIN_OFFICER}</option>
                   <option value={UserRole.HEAD_OF_ADMIN}>{UserRole.HEAD_OF_ADMIN}</option>
                   <option value={UserRole.INTERNAL_CONTROL}>{UserRole.INTERNAL_CONTROL}</option>
-                  <option value={UserRole.EXECUTIVE_OFFICE}>{UserRole.EXECUTIVE_OFFICE}</option>
+                  <option value={UserRole.EXECUTIVE_DIRECTOR}>{UserRole.EXECUTIVE_DIRECTOR}</option>
                   <option value={UserRole.FINANCE_OFFICER}>{UserRole.FINANCE_OFFICER}</option>
                   <option value={UserRole.SYSTEM_ADMIN}>{UserRole.SYSTEM_ADMIN}</option>
                 </select>
@@ -900,7 +1124,7 @@ export default function CrmPortal({
                           <option value={UserRole.ADMIN_OFFICER}>{UserRole.ADMIN_OFFICER}</option>
                           <option value={UserRole.HEAD_OF_ADMIN}>{UserRole.HEAD_OF_ADMIN}</option>
                           <option value={UserRole.INTERNAL_CONTROL}>{UserRole.INTERNAL_CONTROL}</option>
-                          <option value={UserRole.EXECUTIVE_OFFICE}>{UserRole.EXECUTIVE_OFFICE}</option>
+                          <option value={UserRole.EXECUTIVE_DIRECTOR}>{UserRole.EXECUTIVE_DIRECTOR}</option>
                           <option value={UserRole.FINANCE_OFFICER}>{UserRole.FINANCE_OFFICER}</option>
                           <option value={UserRole.SYSTEM_ADMIN}>{UserRole.SYSTEM_ADMIN}</option>
                         </select>
@@ -968,6 +1192,198 @@ export default function CrmPortal({
 
           </div>
 
+        </div>
+      )}
+
+      {subTab === 'users' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-4">
+            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-blue-600" /> Create New System User
+            </h3>
+
+            <form onSubmit={handleCreateUser} className="space-y-4 text-xs font-sans">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Email Address *</label>
+                <input
+                  id="new-user-email"
+                  type="email"
+                  placeholder="user@example.com"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-xs outline-none focus:border-blue-500 font-semibold"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">First Name *</label>
+                  <input
+                    id="new-user-firstname"
+                    type="text"
+                    placeholder="First name"
+                    value={newUserFirstName}
+                    onChange={(e) => setNewUserFirstName(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-xs outline-none focus:border-blue-500 font-semibold"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Last Name *</label>
+                  <input
+                    id="new-user-lastname"
+                    type="text"
+                    placeholder="Last name"
+                    value={newUserLastName}
+                    onChange={(e) => setNewUserLastName(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-xs outline-none focus:border-blue-500 font-semibold"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Password *</label>
+                <input
+                  id="new-user-password"
+                  type="password"
+                  placeholder="Strong password"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-xs outline-none focus:border-blue-500 font-semibold"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Confirm Password *</label>
+                <input
+                  id="new-user-confirm-password"
+                  type="password"
+                  placeholder="Confirm password"
+                  value={newUserConfirmPassword}
+                  onChange={(e) => setNewUserConfirmPassword(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-xs outline-none focus:border-blue-500 font-semibold"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">User Role *</label>
+                <select
+                  id="new-user-role"
+                  className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-xs font-semibold outline-none focus:border-blue-500"
+                  value={newUserRole}
+                  onChange={(e) => setNewUserRole(e.target.value as UserRole)}
+                >
+                  <option value={UserRole.ADMIN_OFFICER}>{UserRole.ADMIN_OFFICER}</option>
+                  <option value={UserRole.HEAD_OF_ADMIN}>{UserRole.HEAD_OF_ADMIN}</option>
+                  <option value={UserRole.INTERNAL_CONTROL}>{UserRole.INTERNAL_CONTROL}</option>
+                  <option value={UserRole.EXECUTIVE_DIRECTOR}>{UserRole.EXECUTIVE_DIRECTOR}</option>
+                  <option value={UserRole.FINANCE_OFFICER}>{UserRole.FINANCE_OFFICER}</option>
+                  <option value={UserRole.SYSTEM_ADMIN}>{UserRole.SYSTEM_ADMIN}</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Department</label>
+                <select
+                  id="new-user-department"
+                  className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-xs font-semibold outline-none focus:border-blue-500"
+                  value={newUserDept}
+                  onChange={(e) => setNewUserDept(e.target.value)}
+                >
+                  {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs">
+                <input
+                  id="new-user-active"
+                  type="checkbox"
+                  checked={newUserIsActive}
+                  onChange={(e) => setNewUserIsActive(e.target.checked)}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="new-user-active" className="font-semibold text-slate-600">Activate account immediately</label>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded text-xs transition-colors shadow-sm"
+              >
+                Create User Account
+              </button>
+            </form>
+          </div>
+
+          <div className="lg:col-span-8 bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-4">
+            <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="font-bold text-slate-800 text-sm">Admin User Accounts</h3>
+                <p className="text-[11px] text-slate-500">Manage user accounts, reset passwords, clear profile data, and enable/disable access.</p>
+              </div>
+              <button
+                id="refresh-user-accounts-btn"
+                onClick={fetchUsers}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-800 rounded px-2 py-1 border border-blue-100 bg-blue-50"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {usersLoading ? (
+              <div className="text-xs text-slate-500">Loading users…</div>
+            ) : usersError ? (
+              <div className="text-xs text-rose-600">Error: {usersError}</div>
+            ) : users.length === 0 ? (
+              <div className="text-xs text-slate-500">No user accounts found. Create one using the form.</div>
+            ) : (
+              <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
+                {users.map((user) => (
+                  <div key={user.id} className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row justify-between items-start gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-800 truncate">{user.email}</span>
+                        {!user.is_active && <span className="text-[9px] uppercase tracking-wider text-rose-700 bg-rose-100 rounded-full px-2 py-0.5">Disabled</span>}
+                        {user.is_verified && <span className="text-[9px] uppercase tracking-wider text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">Verified</span>}
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-1">{user.first_name} {user.last_name} • {user.role} • {user.department || 'N/A'}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Created: {new Date(user.created_at).toLocaleDateString()}</p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <button
+                        onClick={() => handleToggleUserActive(user)}
+                        className="text-[10px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded px-3 py-2 hover:bg-slate-200"
+                      >
+                        {user.is_active ? 'Disable' : 'Enable'}
+                      </button>
+                      <button
+                        onClick={() => handleResetUserPassword(user)}
+                        className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded px-3 py-2 hover:bg-blue-100"
+                      >
+                        Reset Password
+                      </button>
+                      <button
+                        onClick={() => handleClearUserProfile(user)}
+                        className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded px-3 py-2 hover:bg-amber-100"
+                      >
+                        Clear Profile
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUser(user)}
+                        className="text-[10px] font-semibold text-rose-700 bg-rose-50 border border-rose-100 rounded px-3 py-2 hover:bg-rose-100"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1152,7 +1568,7 @@ export default function CrmPortal({
             </p>
             <ul className="text-[11px] list-disc pl-4 text-slate-500 space-y-1">
               <li><strong>Pending for &gt;2 Days:</strong> Push alert notify to Finance Officer: <em>"Payment request {`{Ref}`} has been awaiting processing..."</em></li>
-              <li><strong>Overdue &gt;5 Days:</strong> Escalate alerts directly to Head of Administration and Executive Office.</li>
+              <li><strong>Overdue &gt;5 Days:</strong> Escalate alerts directly to Line Manager and Executive Director.</li>
             </ul>
 
             <div className="pt-2 grid grid-cols-2 gap-2 text-center">
@@ -1209,6 +1625,10 @@ export default function CrmPortal({
                   retirementWindowDays: Number(cmsRetireDays) || 14,
                   requiresExecutiveApprovalAbove: Number(cmsExecThreshold) || 1000000,
                   customLogoText: cmsLogoText,
+                  customLogoUrl: cmsLogoUrl,
+                  customBackgroundUrl: cmsBackgroundUrl,
+                    customFrameColor: cmsFrameColor,
+                    customTableColor: cmsTableColor,
                   themeAccent: cmsAccent,
                   borderStyle: cmsBorder,
                   supportEmail: cmsSupportEmail,
@@ -1357,6 +1777,103 @@ export default function CrmPortal({
                 <p className="text-[9px] text-slate-400 font-medium">Updates header title and system branding dynamically.</p>
               </div>
 
+              <div className="space-y-1.5 pt-4">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block font-mono">Custom Portal Logo</label>
+                <div className="grid gap-2">
+                  <input
+                    type="url"
+                    value={cmsLogoUrl}
+                    onChange={(e) => setCmsLogoUrl(e.target.value)}
+                    placeholder="Paste logo image URL or upload below"
+                    className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-semibold"
+                  />
+                  <div className="flex items-center gap-2">
+                    <label className="w-full cursor-pointer text-xs text-slate-700 bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 text-center hover:bg-slate-200 transition-all">
+                      Browse logo file
+                      <input type="file" accept="image/*" className="hidden" onChange={handleLogoFileSelection} />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleUploadLogo}
+                      disabled={logoUploadLoading}
+                      className="px-3 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50"
+                    >
+                      {logoUploadLoading ? 'Uploading…' : 'Upload'}
+                    </button>
+                  </div>
+                  {logoUploadStatus && <p className="text-[10px] text-slate-500">{logoUploadStatus}</p>}
+                  {cmsLogoUrl && (
+                    <img src={cmsLogoUrl} alt="Logo preview" className="max-h-16 rounded-lg border border-slate-200 object-contain" />
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1.5 pt-4">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block font-mono">Login Portal Background</label>
+                <div className="grid gap-2">
+                  <input
+                    type="url"
+                    value={cmsBackgroundUrl}
+                    onChange={(e) => setCmsBackgroundUrl(e.target.value)}
+                    placeholder="Paste background image URL or upload below"
+                    className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-semibold"
+                  />
+                  <div className="flex items-center gap-2">
+                    <label className="w-full cursor-pointer text-xs text-slate-700 bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 text-center hover:bg-slate-200 transition-all">
+                      Browse background file
+                      <input type="file" accept="image/*" className="hidden" onChange={handleBackgroundFileSelection} />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleUploadBackground}
+                      disabled={backgroundUploadLoading}
+                      className="px-3 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50"
+                    >
+                      {backgroundUploadLoading ? 'Uploading…' : 'Upload'}
+                    </button>
+                  </div>
+                  {backgroundUploadStatus && <p className="text-[10px] text-slate-500">{backgroundUploadStatus}</p>}
+                  {cmsBackgroundUrl && (
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      <img src={cmsBackgroundUrl} alt="Background preview" className="w-full h-24 object-cover" />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1.5 pt-4">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block font-mono">Login Card Frame Color</label>
+                <input
+                  type="color"
+                  value={cmsFrameColor}
+                  onChange={(e) => setCmsFrameColor(e.target.value)}
+                  className="w-full h-12 p-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 outline-none transition-all"
+                />
+                <p className="text-[9px] text-slate-400 font-medium">Choose a border/frame accent for login and portal containers.</p>
+              </div>
+
+              <div className="space-y-1.5 pt-4">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block font-mono">Table Border Color</label>
+                <input
+                  type="color"
+                  value={cmsTableColor}
+                  onChange={(e) => setCmsTableColor(e.target.value)}
+                  className="w-full h-12 p-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 outline-none transition-all"
+                />
+                <p className="text-[9px] text-slate-400 font-medium">Choose table and data grid border styling for dashboard content.</p>
+              </div>
+
+              <div className="space-y-1.5 pt-4">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block font-mono">Icon & Button Color</label>
+                <input
+                  type="color"
+                  value={cmsIconColor}
+                  onChange={(e) => setCmsIconColor(e.target.value)}
+                  className="w-full h-12 p-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 outline-none transition-all"
+                />
+                <p className="text-[9px] text-slate-400 font-medium">Choose color for UI icons, buttons, and interactive elements throughout the portal.</p>
+              </div>
+
             </div>
 
             {/* Box 2: Financial Policy Configurations (CMS Control) */}
@@ -1401,7 +1918,7 @@ export default function CrmPortal({
                   placeholder="1000000"
                   className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-semibold"
                 />
-                <p className="text-[9px] text-slate-400 font-medium">Amounts above this value automatically route to the Executive Office for final screening.</p>
+                <p className="text-[9px] text-slate-400 font-medium">Amounts above this value automatically route to the Executive Director for final screening.</p>
               </div>
 
             </div>

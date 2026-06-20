@@ -31,7 +31,8 @@ export async function registerUser(
   password: string,
   firstName: string,
   lastName: string,
-  department?: string
+  department?: string,
+  profilePictureUrl?: string | null
 ): Promise<AuthToken> {
   // Check if user exists
   const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
@@ -46,12 +47,12 @@ export async function registerUser(
   // Hash password
   const passwordHash = await bcrypt.hash(password, 10);
 
-  // Create user
+  // Create user with optional profile picture
   const result = await query(
-    `INSERT INTO users (email, password_hash, first_name, last_name, department, role)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING id, email, first_name, last_name, department, role, is_active, is_verified, created_at`,
-    [email, passwordHash, firstName, lastName, department || 'Administration', role]
+    `INSERT INTO users (email, password_hash, first_name, last_name, department, role, profile_picture_url)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id, email, first_name, last_name, department, role, profile_picture_url, is_active, is_verified, created_at`,
+    [email, passwordHash, firstName, lastName, department || 'Administration', role, profilePictureUrl || null]
   );
 
   const user = result.rows[0];
@@ -110,68 +111,6 @@ export async function loginUser(email: string, password: string): Promise<AuthTo
       is_verified: user.is_verified,
       created_at: user.created_at
     }
-  };
-}
-
-export async function registerOrLoginOAuth(
-  provider: string,
-  oauthId: string,
-  email: string,
-  firstName: string,
-  lastName: string,
-  profilePictureUrl?: string
-): Promise<AuthToken> {
-  // Check if user exists by OAuth
-  let result = await query(
-    'SELECT id, email, first_name, last_name, department, role, profile_picture_url, is_active, is_verified, created_at FROM users WHERE oauth_provider = $1 AND oauth_id = $2',
-    [provider, oauthId]
-  );
-
-  let user = result.rows[0];
-
-  if (!user) {
-    // Try to find by email
-    result = await query('SELECT id, is_active FROM users WHERE email = $1', [email]);
-    
-    if (result.rows.length > 0) {
-      user = result.rows[0];
-      if (!user.is_active) {
-        throw new Error('Account is disabled');
-      }
-      await query(
-        'UPDATE users SET oauth_provider = $1, oauth_id = $2, profile_picture_url = $3 WHERE id = $4',
-        [provider, oauthId, profilePictureUrl, user.id]
-      );
-      const userData = await getUserById(user.id);
-      if (!userData) {
-        throw new Error('Failed to load user profile');
-      }
-      user = userData as any;
-    } else {
-      // Create new user
-      result = await query(
-        `INSERT INTO users (email, first_name, last_name, oauth_provider, oauth_id, profile_picture_url, is_verified, role)
-         VALUES ($1, $2, $3, $4, $5, $6, true, 'staff')
-         RETURNING id, email, first_name, last_name, department, role, profile_picture_url, is_active, is_verified, created_at`,
-        [email, firstName, lastName, provider, oauthId, profilePictureUrl]
-      );
-      user = result.rows[0];
-    }
-  }
-
-  if (!user.is_active) {
-    throw new Error('Account is disabled');
-  }
-
-  // Update last login
-  await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
-
-  const token = generateToken(user.id);
-
-  return {
-    token,
-    expiresIn: JWT_EXPIRY,
-    user
   };
 }
 
@@ -312,6 +251,64 @@ export async function updateUserAccount(
     `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${paramCount}
      RETURNING id, email, first_name, last_name, department, role, profile_picture_url, is_active, is_verified, created_at`,
     values
+  );
+
+  return result.rows[0];
+}
+
+export async function createUserAccount(
+  email: string,
+  password: string,
+  firstName: string,
+  lastName: string,
+  department: string,
+  role: string,
+  profilePictureUrl?: string | null,
+  isActive = true
+): Promise<User> {
+  const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
+  if (existingUser.rows.length > 0) {
+    throw new Error('Email already registered');
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  const result = await query(
+    `INSERT INTO users (email, password_hash, first_name, last_name, department, role, profile_picture_url, is_active)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id, email, first_name, last_name, department, role, profile_picture_url, is_active, is_verified, created_at`,
+    [email, passwordHash, firstName, lastName, department, role, profilePictureUrl || null, isActive]
+  );
+
+  const user = result.rows[0];
+  await generateEmailVerificationToken(user.id);
+  return user;
+}
+
+export async function deleteUserAccount(userId: string): Promise<User> {
+  const result = await query(
+    `DELETE FROM users WHERE id = $1
+     RETURNING id, email, first_name, last_name, department, role, profile_picture_url, is_active, is_verified, created_at`,
+    [userId]
+  );
+
+  if (result.rows.length === 0) {
+    throw new Error('User not found');
+  }
+
+  return result.rows[0];
+}
+
+export async function clearUserProfile(userId: string): Promise<User> {
+  const result = await query(
+    `UPDATE users
+     SET first_name = '',
+         last_name = '',
+         department = '',
+         profile_picture_url = NULL,
+         updated_at = NOW()
+     WHERE id = $1
+     RETURNING id, email, first_name, last_name, department, role, profile_picture_url, is_active, is_verified, created_at`,
+    [userId]
   );
 
   return result.rows[0];

@@ -1,84 +1,65 @@
 import express, { Request, Response, NextFunction } from 'express';
-import passport from 'passport';
-import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import { OIDCStrategy as MicrosoftStrategy } from 'passport-azure-ad';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import {
   registerUser,
   loginUser,
-  registerOrLoginOAuth,
   generatePasswordResetToken,
   resetPassword,
   generateEmailVerificationToken,
   verifyEmail,
   getUserById,
   getUsers,
+  createUserAccount,
+  deleteUserAccount,
   updateUserAccount,
+  clearUserProfile,
   resetUserPasswordByAdmin,
   verifyToken,
   updateUserProfile
 } from '../services/authService';
-import { logAuditEvent } from '../services/crmService';
+import { logAuditEvent } from '../services/cmsService';
 
 const router = express.Router();
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-const BACKEND_URL = process.env.BACKEND_URL || `http://localhost:${process.env.SERVER_PORT || 4001}`;
-
-const googleClientId = process.env.GOOGLE_CLIENT_ID;
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-const googleCallbackUrl = process.env.GOOGLE_CALLBACK_URL || `${BACKEND_URL}/api/auth/google/callback`;
-
-const msClientId = process.env.MSAL_CLIENT_ID;
-const msClientSecret = process.env.MSAL_CLIENT_SECRET;
-const msTenantId = process.env.MSAL_TENANT_ID;
-const microsoftCallbackUrl = process.env.MICROSOFT_CALLBACK_URL || `${BACKEND_URL}/api/auth/microsoft/callback`;
-
-// Conditionally register Google strategy only if credentials are provided
-if (googleClientId && googleClientId !== 'your_google_client_id') {
-  passport.use(
-    new GoogleStrategy(
-      {
-        clientID: googleClientId,
-        clientSecret: googleClientSecret || '',
-        callbackURL: googleCallbackUrl,
-        passReqToCallback: false
-      },
-      (_accessToken, _refreshToken, profile, done) => {
-        done(null, profile);
-      }
-    )
-  );
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(process.cwd(), 'uploads', 'profile-pictures');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Conditionally register Microsoft strategy only if credentials are provided
-if (msClientId && msClientId !== 'your_microsoft_client_id') {
-  passport.use(
-    new MicrosoftStrategy(
-      {
-        identityMetadata: `https://login.microsoftonline.com/${msTenantId || 'common'}/v2.0/.well-known/openid-configuration`,
-        clientID: msClientId,
-        responseType: 'code id_token',
-        responseMode: 'query',
-        redirectUrl: microsoftCallbackUrl,
-        allowHttpForRedirectUrl: true,
-        clientSecret: msClientSecret || '',
-        scope: ['profile', 'email', 'openid'],
-        passReqToCallback: false
-      },
-      (_iss, _sub, profile, _accessToken, _refreshToken, done) => {
-        done(null, profile);
-      }
-    )
-  );
-}
-
-passport.serializeUser((user, done) => {
-  done(null, user);
+// Configure multer for profile picture uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename with timestamp
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname);
+    const name = path.basename(file.originalname, ext);
+    cb(null, `${name}-${uniqueSuffix}${ext}`);
+  }
 });
 
-passport.deserializeUser((obj, done) => {
-  done(null, obj as any);
+const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  // Only accept image files
+  if (!file.mimetype.startsWith('image/')) {
+    cb(new Error('Only image files are allowed'));
+  } else {
+    cb(null, true);
+  }
+};
+
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter
 });
+
 
 // Middleware to verify JWT token
 export function authenticateToken(req: Request, res: Response, next: NextFunction) {
@@ -102,15 +83,31 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 // ============ AUTH ROUTES ============
 
 // Register with email/password
-router.post('/auth/register', async (req: Request, res: Response) => {
+router.post('/auth/register', upload.single('profilePicture'), async (req: Request, res: Response) => {
   try {
+    // Debug logging
+    console.log('Register request received');
+    console.log('req.body:', req.body);
+    console.log('req.file:', req.file ? { filename: req.file.filename, size: req.file.size, mimetype: req.file.mimetype } : 'none');
+    
     const { email, password, firstName, lastName, department } = req.body;
 
     if (!email || !password || !firstName || !lastName) {
+      // Clean up uploaded file if validation fails
+      if (req.file) {
+        fs.unlink(req.file.path, () => {});
+      }
+      console.log('Missing required fields:', { email: !!email, password: !!password, firstName: !!firstName, lastName: !!lastName });
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const result = await registerUser(email, password, firstName, lastName, department);
+    // Generate profile picture URL if file was uploaded
+    let profilePictureUrl = null;
+    if (req.file) {
+      profilePictureUrl = `/uploads/profile-pictures/${req.file.filename}`;
+    }
+
+    const result = await registerUser(email, password, firstName, lastName, department, profilePictureUrl);
 
     // Log audit event
     await logAuditEvent(
@@ -119,13 +116,17 @@ router.post('/auth/register', async (req: Request, res: Response) => {
       'USER',
       result.user.id,
       null,
-      { email, firstName, lastName },
+      { email, firstName, lastName, hasProfilePicture: !!profilePictureUrl },
       req.ip,
       req.get('user-agent')
     );
 
     res.status(201).json(result);
   } catch (error: any) {
+    // Clean up uploaded file if registration fails
+    if ((req as any).file) {
+      fs.unlink((req as any).file.path, () => {});
+    }
     res.status(400).json({ error: error.message });
   }
 });
@@ -157,127 +158,6 @@ router.post('/auth/login', async (req: Request, res: Response) => {
   } catch (error: any) {
     res.status(401).json({ error: error.message });
   }
-});
-
-// OAuth login/register
-router.post('/auth/oauth', async (req: Request, res: Response) => {
-  try {
-    const { provider, oauthId, email, firstName, lastName, profilePictureUrl } = req.body;
-
-    if (!provider || !oauthId || !email) {
-      return res.status(400).json({ error: 'Missing required OAuth fields' });
-    }
-
-    const result = await registerOrLoginOAuth(
-      provider,
-      oauthId,
-      email,
-      firstName,
-      lastName,
-      profilePictureUrl
-    );
-
-    // Log audit event
-    await logAuditEvent(
-      result.user.id,
-      `OAUTH_LOGIN_${provider.toUpperCase()}`,
-      'USER',
-      result.user.id,
-      null,
-      null,
-      req.ip,
-      req.get('user-agent')
-    );
-
-    res.json(result);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-// OAuth redirect start
-router.get(
-  '/auth/google',
-  (req: Request, res: Response, next: NextFunction) => {
-    if (!googleClientId || !googleClientSecret || googleClientId === 'your_google_client_id') {
-      return res.status(501).json({ message: 'Google OAuth is not configured. Please configure Google client credentials or use email/password login.' });
-    }
-    next();
-  },
-  passport.authenticate('google', { scope: ['profile', 'email'] })
-);
-
-router.get(
-  '/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: `${FRONTEND_URL}/?oauth=failed`, session: false }),
-  async (req: Request, res: Response) => {
-    const profile = (req as any).user as any;
-    if (!profile || !profile.emails?.length) {
-      return res.redirect(`${FRONTEND_URL}/?oauth=failed`);
-    }
-
-    const email = profile.emails[0].value;
-    const oauthId = profile.id;
-    const firstName = profile.name?.givenName || email.split('@')[0];
-    const lastName = profile.name?.familyName || '';
-    const profilePictureUrl = profile.photos?.[0]?.value;
-
-    try {
-      const result = await registerOrLoginOAuth('google', oauthId, email, firstName, lastName, profilePictureUrl);
-      const token = result.token;
-      return res.redirect(`${FRONTEND_URL}/?oauth=success&token=${encodeURIComponent(token)}`);
-    } catch (error) {
-      return res.redirect(`${FRONTEND_URL}/?oauth=failed`);
-    }
-  }
-);
-
-router.get(
-  '/auth/microsoft',
-  (req: Request, res: Response, next: NextFunction) => {
-    if (!msClientId || !msClientSecret || !msTenantId || msClientId === 'your_microsoft_client_id') {
-      return res.status(501).json({ message: 'Microsoft OAuth is not configured. Please configure Azure app credentials or use email/password login.' });
-    }
-    next();
-  },
-  passport.authenticate('azuread-openidconnect')
-);
-
-router.get(
-  '/auth/microsoft/callback',
-  passport.authenticate('azuread-openidconnect', { failureRedirect: `${FRONTEND_URL}/?oauth=failed`, session: false }),
-  async (req: Request, res: Response) => {
-    const profile = (req as any).user as any;
-    if (!profile || !profile._json?.email) {
-      return res.redirect(`${FRONTEND_URL}/?oauth=failed`);
-    }
-
-    const email = profile._json.email;
-    const oauthId = profile.oid || profile._json.oid || profile.sub;
-    const firstName = profile.name?.givenName || profile._json.given_name || email.split('@')[0];
-    const lastName = profile.name?.familyName || profile._json.family_name || '';
-    const profilePictureUrl = profile.photos?.[0]?.value || profile._json.picture;
-
-    try {
-      const result = await registerOrLoginOAuth('microsoft', oauthId, email, firstName, lastName, profilePictureUrl);
-      const token = result.token;
-      return res.redirect(`${FRONTEND_URL}/?oauth=success&token=${encodeURIComponent(token)}`);
-    } catch (error) {
-      return res.redirect(`${FRONTEND_URL}/?oauth=failed`);
-    }
-  }
-);
-
-router.get('/auth/microsoft', (_req: Request, res: Response) => {
-  res.status(501).json({
-    message: 'Google OAuth is not configured. Please configure Google client credentials or use email/password login.'
-  });
-});
-
-router.get('/auth/microsoft', (_req: Request, res: Response) => {
-  res.status(501).json({
-    message: 'Microsoft OAuth is not configured. Please configure Azure app credentials or use email/password login.'
-  });
 });
 
 // Request password reset
@@ -403,6 +283,49 @@ router.get('/auth/users', authenticateToken, async (req: Request, res: Response)
   }
 });
 
+// IT Admin: Create new user account
+router.post('/auth/users', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { email, password, firstName, lastName, department, role, profilePictureUrl, isActive } = req.body;
+
+    const requestingUser = await getUserById(userId);
+    if (!requestingUser || requestingUser.role !== 'System Administrator') {
+      return res.status(403).json({ error: 'Admin privileges required' });
+    }
+
+    if (!email || !password || !firstName || !lastName || !role) {
+      return res.status(400).json({ error: 'Email, password, first name, last name and role are required' });
+    }
+
+    const newUser = await createUserAccount(
+      email,
+      password,
+      firstName,
+      lastName,
+      department || 'Administration',
+      role,
+      profilePictureUrl || null,
+      isActive !== undefined ? !!isActive : true
+    );
+
+    await logAuditEvent(
+      userId,
+      'USER_ACCOUNT_CREATED',
+      'USER',
+      newUser.id,
+      null,
+      newUser,
+      req.ip,
+      req.get('user-agent')
+    );
+
+    res.status(201).json(newUser);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // IT Admin: Update user account state
 router.put('/auth/users/:id', authenticateToken, async (req: Request, res: Response) => {
   try {
@@ -446,6 +369,72 @@ router.put('/auth/users/:id', authenticateToken, async (req: Request, res: Respo
     );
 
     res.json(updatedUser);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// IT Admin: Delete user account
+router.delete('/auth/users/:id', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const requestingUser = await getUserById(userId);
+    if (!requestingUser || requestingUser.role !== 'System Administrator') {
+      return res.status(403).json({ error: 'Admin privileges required' });
+    }
+
+    const targetUser = await getUserById(req.params.id);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'Target user not found' });
+    }
+
+    const deletedUser = await deleteUserAccount(req.params.id);
+
+    await logAuditEvent(
+      userId,
+      'USER_ACCOUNT_DELETED',
+      'USER',
+      req.params.id,
+      targetUser,
+      deletedUser,
+      req.ip,
+      req.get('user-agent')
+    );
+
+    res.json(deletedUser);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// IT Admin: Clear user profile metadata
+router.patch('/auth/users/:id/clear-profile', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const requestingUser = await getUserById(userId);
+    if (!requestingUser || requestingUser.role !== 'System Administrator') {
+      return res.status(403).json({ error: 'Admin privileges required' });
+    }
+
+    const targetUser = await getUserById(req.params.id);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'Target user not found' });
+    }
+
+    const clearedUser = await clearUserProfile(req.params.id);
+
+    await logAuditEvent(
+      userId,
+      'USER_PROFILE_CLEARED',
+      'USER',
+      req.params.id,
+      targetUser,
+      clearedUser,
+      req.ip,
+      req.get('user-agent')
+    );
+
+    res.json(clearedUser);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

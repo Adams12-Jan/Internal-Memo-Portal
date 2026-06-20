@@ -4,9 +4,8 @@ import multer from 'multer';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import dotenv from 'dotenv';
-import passport from 'passport';
 import authRoutes from './src/routes/authRoutes';
-import crmRoutes from './src/routes/crmRoutes';
+import cmsRoutes from './src/routes/cmsRoutes';
 import { initializeDatabase } from './src/db/db';
 
 dotenv.config();
@@ -47,7 +46,6 @@ const upload = multer({
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(passport.initialize());
 app.use('/uploads', express.static(uploadsDir));
 
 const getHostUrl = (req: express.Request) => {
@@ -111,22 +109,9 @@ app.get('/', (_req, res) => {
 });
 
 app.get('/api/status', (_req, res) => {
-  const isGoogleConfigured = Boolean(
-    process.env.GOOGLE_CLIENT_ID &&
-    process.env.GOOGLE_CLIENT_SECRET &&
-    process.env.GOOGLE_CLIENT_ID !== 'your_google_client_id'
-  );
-  const isMicrosoftConfigured = Boolean(
-    process.env.MSAL_CLIENT_ID &&
-    process.env.MSAL_CLIENT_SECRET &&
-    process.env.MSAL_TENANT_ID &&
-    process.env.MSAL_CLIENT_ID !== 'your_microsoft_client_id'
-  );
   res.json({
     status: 'ok',
-    timestamp: new Date().toISOString(),
-    configuredMicrosoft: isMicrosoftConfigured,
-    configuredGoogle: isGoogleConfigured
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -208,10 +193,18 @@ app.post('/api/microsoft/sign', upload.single('file'), async (req, res) => {
   });
 });
 
-// Register authentication and CRM routes under /api so Vite proxy and frontend API base align.
+// Register authentication and CMS routes under /api so Vite proxy and frontend API base align.
 app.use('/api', authRoutes);
-app.use('/api', crmRoutes);
+app.use('/api', cmsRoutes);
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`Internal Memo Portal API server running on http://localhost:${port}`);
+});
+
+server.on('error', err => {
+  if ((err as any).code === 'EADDRINUSE') {
+    console.error(`Port ${port} is already in use. Stop the process using it or set SERVER_PORT to a different value.`);
+    process.exit(1);
+  }
+  throw err;
 });

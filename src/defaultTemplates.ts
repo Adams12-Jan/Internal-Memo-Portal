@@ -24,7 +24,7 @@ export const DEFAULT_TEMPLATES: EmailTemplate[] = [
   {
     id: "cash_advance_submitted",
     name: "Cash Advance Request Submitted",
-    description: "Dispatched to the Head of Administration when a new funding memo is filed.",
+    description: "Dispatched to the Line Manager when a new funding memo is filed.",
     subject: "[SUBMITTED] New Cash Advance Request: {{referenceNumber}} - {{staffName}}",
     bannerColor: "#2563EB", // Blue
     body: `<div style="font-family: 'Inter', -apple-system, sans-serif; background-color: #F8FAFC; padding: 40px 20px; color: #1E293B; line-height: 1.5;">
@@ -37,7 +37,7 @@ export const DEFAULT_TEMPLATES: EmailTemplate[] = [
     
     <!-- Body -->
     <div style="padding: 32px;">
-      <p style="margin: 0 0 20px 0; font-size: 14px; color: #475569;">Hello <strong>Tina Ofeno (Head of Administration)</strong>,</p>
+      <p style="margin: 0 0 20px 0; font-size: 14px; color: #475569;">Hello <strong>Tina Ofeno (Line Manager)</strong>,</p>
       
       <p style="margin: 0 0 20px 0; font-size: 14px; color: #475569; leading-relaxed: true;">
         A new administrative funding proposal has been logged and signed on the portal. Please review the parameters below and authorize forwarding into compliance desks:

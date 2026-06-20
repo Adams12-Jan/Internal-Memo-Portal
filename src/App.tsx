@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   FileText, Clock, CheckCircle2, XCircle, CreditCard, Banknote, 
   HelpCircle, Archive, AlertCircle, ShieldCheck, TrendingUp, Sparkles,
   Users, LogOut, ShieldAlert, KeyRound, Menu, X, Landmark, UserMinus, 
-  Sun, Moon, 
   BellRing, ListCollapse, Eye, Filter, RefreshCw, Search
 } from 'lucide-react';
 
@@ -24,7 +23,7 @@ import {
   SystemCustomSettings
 } from './types';
 
-import authService, { AuthUser } from './services/authClient';
+import firebaseAuthService, { AuthUser } from './services/firebaseAuthService';
 import { 
   getStoredData, 
   saveStoredData, 
@@ -35,7 +34,8 @@ import {
   getStoredSentEmails,
   saveStoredSentEmails,
   getStoredStaffMembers,
-  saveStoredStaffMembers
+  saveStoredStaffMembers,
+  clearUserData
 } from './mockData';
 
 import { EmailTemplate, SentEmail } from './types';
@@ -50,7 +50,7 @@ import Reports from './components/Reports';
 import AuditTrail from './components/AuditTrail';
 import NotificationBell from './components/NotificationBell';
 import ModernAuth from './components/ModernAuth';
-import CrmPortal from './components/CrmPortal';
+import CmsPortal from './components/CmsPortal';
 
 export default function App() {
   // Global State
@@ -58,7 +58,6 @@ export default function App() {
   const [retirements, setRetirements] = useState<CashAdvanceRetirement[]>([]);
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [notifications, setNotifications] = useState<NotificationEntry[]>([]);
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => localStorage.getItem('ca_dark_mode') === 'true');
 
   // Email dynamic templates design states
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
@@ -66,17 +65,17 @@ export default function App() {
   const [staffMembers, setStaffMembers] = useState<{ name: string; role: UserRole; department: string }[]>([]);
 
   // Simulation and authentication controls
-  const [authUser, setAuthUser] = useState<AuthUser | null>(() => authService.getUser());
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => authService.isAuthenticated());
+  const [authUser, setAuthUser] = useState<AuthUser | null>(() => firebaseAuthService.getUser());
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => firebaseAuthService.isAuthenticated());
   const [activeUserIdx, setActiveUserIdx] = useState(() => parseInt(localStorage.getItem('ca_session_user_idx') || '0'));
 
-  const authUserRole = authUser && Object.values(UserRole).includes(authUser.role as UserRole)
-    ? (authUser.role as UserRole)
+  const authUserRole = authUser
+    ? (authUser.portal_identity
+      ? mapPortalIdentityToRole(authUser.portal_identity)
+      : (Object.values(UserRole).includes(authUser.role as UserRole)
+        ? (authUser.role as UserRole)
+        : UserRole.ADMIN_OFFICER))
     : UserRole.ADMIN_OFFICER;
-
-  const currentUser = authUser
-    ? { name: `${authUser.first_name} ${authUser.last_name}`, role: authUserRole, department: authUser.department || 'Administration', avatar: authUser.profile_picture_url }
-    : { name: staffMembers[activeUserIdx]?.name || 'Ovat Daniel', role: staffMembers[activeUserIdx]?.role || UserRole.ADMIN_OFFICER, department: staffMembers[activeUserIdx]?.department || 'Administration', avatar: undefined };
 
   // CMS System Settings Controller (Full IT admin access)
   const DEFAULT_SYSTEM_SETTINGS: SystemCustomSettings = {
@@ -84,7 +83,12 @@ export default function App() {
     retirementWindowDays: 14,
     requiresExecutiveApprovalAbove: 1000000,
     customLogoText: 'Memo Portal',
-    themeAccent: 'default',
+    customLogoUrl: '',
+    customBackgroundUrl: '',
+    customFrameColor: '#ffffff',
+    customTableColor: '#cbd5e1',
+    customIconColor: '#6366f1',
+    themeAccent: 'vetiva',
     borderStyle: 'default',
     supportEmail: 'it.support@vetiva.com',
     supportPhone: '+234 1 448 9000',
@@ -95,7 +99,7 @@ export default function App() {
     const raw = localStorage.getItem('ca_system_settings');
     if (raw) {
       try {
-        return JSON.parse(raw);
+        return { ...DEFAULT_SYSTEM_SETTINGS, ...JSON.parse(raw) };
       } catch (e) {
         // use default
       }
@@ -103,9 +107,38 @@ export default function App() {
     return DEFAULT_SYSTEM_SETTINGS;
   });
 
+  const [profileEditOpen, setProfileEditOpen] = useState(false);
+  const [profileFirstName, setProfileFirstName] = useState(authUser?.first_name || '');
+  const [profileLastName, setProfileLastName] = useState(authUser?.last_name || '');
+  const [profileDepartment, setProfileDepartment] = useState(authUser?.department || 'Administration');
+  const [profilePictureUrl, setProfilePictureUrl] = useState(authUser?.profile_picture_url || '');
+  const [profilePicturePreview, setProfilePicturePreview] = useState('');
+  const [profileSaveStatus, setProfileSaveStatus] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    setProfilePictureUrl(authUser?.profile_picture_url || '');
+    setProfilePicturePreview('');
+  }, [authUser]);
+
+  const currentUser = authUser
+    ? { name: `${authUser.first_name} ${authUser.last_name}`, role: authUserRole, department: authUser.department || 'Administration', avatar: profilePictureUrl || authUser.profile_picture_url }
+    : { name: staffMembers[activeUserIdx]?.name || 'Ovat Daniel', role: staffMembers[activeUserIdx]?.role || UserRole.ADMIN_OFFICER, department: staffMembers[activeUserIdx]?.department || 'Administration', avatar: undefined };
+
+  const displayProfileAvatar = profilePicturePreview || currentUser.avatar || undefined;
+
   const handleSaveSystemSettings = (nextSettings: SystemCustomSettings) => {
-    setSystemSettings(nextSettings);
-    localStorage.setItem('ca_system_settings', JSON.stringify(nextSettings));
+    const trimmedSettings: SystemCustomSettings = {
+      ...nextSettings,
+      customLogoUrl: nextSettings.customLogoUrl?.trim() || '',
+      customBackgroundUrl: nextSettings.customBackgroundUrl?.trim() || ''
+      , customFrameColor: nextSettings.customFrameColor?.trim() || '#ffffff',
+      customTableColor: nextSettings.customTableColor?.trim() || '#cbd5e1',
+      customIconColor: nextSettings.customIconColor?.trim() || '#6366f1'
+    };
+
+    setSystemSettings(trimmedSettings);
+    localStorage.setItem('ca_system_settings', JSON.stringify(trimmedSettings));
     
     // Log system configuration change in audit log
     const newAudit: AuditLogEntry = {
@@ -116,11 +149,20 @@ export default function App() {
       role: currentUser.role,
       action: 'CMS Theme & System Rules Configuration Updated',
       date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      comment: `Primary accent: ${nextSettings.themeAccent}, Limit: ₦${nextSettings.maxCashAdvance.toLocaleString()}`
+      comment: `Primary accent: ${trimmedSettings.themeAccent}, Limit: ₦${trimmedSettings.maxCashAdvance.toLocaleString()}`
     };
     const nextLogs = [newAudit, ...logs];
     setLogs(nextLogs);
-    saveStoredData({ logs: nextLogs });
+    if (shouldUseGlobalQueue(authUserRole)) {
+      const globalData = getStoredData();
+      const mergedLogs = mergeLogs(globalData.logs, nextLogs);
+      saveStoredData({ logs: mergedLogs });
+      if (authUser?.id) {
+        saveStoredData({ logs: nextLogs }, authUser.id);
+      }
+    } else if (authUser?.id) {
+      saveStoredData({ logs: nextLogs }, authUser.id);
+    }
   };
 
   // Dynamic CSS injector for CMS custom branding themes & styles
@@ -139,6 +181,13 @@ export default function App() {
       p500 = '#EF4444'; p600 = '#DC2626'; p700 = '#B91C1C'; p100 = '#fee2e2'; p50 = '#fef2f2';
     } else if (pAccent === 'orange') {
       p500 = '#F97316'; p600 = '#EA580C'; p700 = '#C2410C'; p100 = '#ffedd5'; p50 = '#fff7ed';
+    } else if (pAccent === 'vetiva') {
+      // Vetiva brand palette
+      p500 = '#977A4A'; // gold/bronze
+      p600 = '#977A4A';
+      p700 = '#A68D63'; // light gold
+      p100 = '#EFEFF1'; // off white
+      p50 = '#D3C8B1'; // warm beige
     }
 
     let rXl = '0.75rem', rLg = '0.5rem', rMd = '0.375rem';
@@ -172,11 +221,34 @@ export default function App() {
       styleEl.id = 'dynamic-cms-theme-block';
       document.head.appendChild(styleEl);
     }
-    styleEl.innerHTML = cssContent;
+    styleEl.innerHTML = cssContent + `
+      :root {
+        --cms-frame-bg: ${systemSettings.customFrameColor || '#ffffff'};
+        --cms-frame-border: ${systemSettings.customFrameColor || '#cbd5e1'};
+        --cms-table-border: ${systemSettings.customTableColor || '#cbd5e1'};
+        --cms-icon-color: ${systemSettings.customIconColor || '#6366f1'};
+      }
+      .portal-dashboard .border-slate-200,
+      .portal-dashboard .border-slate-150,
+      .portal-dashboard .border-slate-100,
+      .portal-dashboard .border-slate-300 {
+        border-color: var(--cms-frame-border) !important;
+      }
+      .portal-dashboard table,
+      .portal-dashboard th,
+      .portal-dashboard td,
+      .portal-dashboard .divide-slate-100 > *,
+      .portal-dashboard .divide-slate-150 > * {
+        border-color: var(--cms-table-border) !important;
+      }
+      #app-header-logout-trigger {
+        color: var(--cms-icon-color) !important;
+      }
+    `;
   }, [systemSettings, currentUser]);
 
   // Navigation
-  const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, requests, retirement, reports, audit, crm
+  const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, requests, retirement, reports, audit, cms
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Focus View states
@@ -184,20 +256,29 @@ export default function App() {
   const [selectedRetirementId, setSelectedRetirementId] = useState<string | null>(null);
   const [isInitiatingAdvance, setIsInitiatingAdvance] = useState(false);
   const [isInitiatingRetirement, setIsInitiatingRetirement] = useState(false);
-  const [profileEditOpen, setProfileEditOpen] = useState(false);
-  const [profileFirstName, setProfileFirstName] = useState(authUser?.first_name || '');
-  const [profileLastName, setProfileLastName] = useState(authUser?.last_name || '');
-  const [profileDepartment, setProfileDepartment] = useState(authUser?.department || 'Administration');
-  const [profilePictureUrl, setProfilePictureUrl] = useState(authUser?.profile_picture_url || '');
-  const [profileSaveStatus, setProfileSaveStatus] = useState<string | null>(null);
 
   // Filters within specific lists
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [refSearch, setRefSearch] = useState('');
 
-  // Auto load from LocalStorage on mount
+  // Auto load from LocalStorage on mount (per-user data)
   useEffect(() => {
-    const data = getStoredData();
+    const userId = authUser?.id;
+    if (!userId) {
+      setAdvances([]);
+      setRetirements([]);
+      setLogs([]);
+      setNotifications([]);
+      setTemplates(getStoredTemplates());
+      setSentEmails(getStoredSentEmails());
+      setStaffMembers(getStoredStaffMembers());
+      return;
+    }
+
+    const data = shouldUseGlobalQueue(authUserRole)
+      ? getStoredData()
+      : getStoredData(userId);
+
     setAdvances(data.advances);
     setRetirements(data.retirements);
     setLogs(data.logs);
@@ -205,18 +286,37 @@ export default function App() {
     setTemplates(getStoredTemplates());
     setSentEmails(getStoredSentEmails());
     setStaffMembers(getStoredStaffMembers());
-  }, []);
+  }, [authUser?.id, authUserRole]);
 
-  // Sync Dark Mode class on document element
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
+  const shouldUseGlobalQueue = (role: UserRole) => {
+    return [
+      UserRole.SYSTEM_ADMIN,
+      UserRole.HEAD_OF_ADMIN,
+      UserRole.INTERNAL_CONTROL,
+      UserRole.EXECUTIVE_DIRECTOR,
+      UserRole.FINANCE_OFFICER
+    ].includes(role);
+  };
 
-  // Save changes to localStorage helper
+  const mergeById = <T extends { id: string }>(base: T[], updates: T[]) => {
+    const map = new Map<string, T>(base.map(item => [item.id, item]));
+    updates.forEach(item => map.set(item.id, item));
+    return Array.from(map.values());
+  };
+
+  const mergeLogs = (base: AuditLogEntry[], updates: AuditLogEntry[]) => {
+    const map = new Map<string, AuditLogEntry>(base.map(item => [item.id, item]));
+    updates.forEach(item => map.set(item.id, item));
+    return Array.from(map.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  };
+
+  const mergeNotifications = (base: NotificationEntry[], updates: NotificationEntry[]) => {
+    const map = new Map<string, NotificationEntry>(base.map(item => [item.id, item]));
+    updates.forEach(item => map.set(item.id, item));
+    return Array.from(map.values());
+  };
+
+  // Save changes to localStorage helper (per-user data + shared queue sync)
   const handleSaveData = (
     nextAdvances: CashAdvanceRequest[],
     nextRetirements: CashAdvanceRetirement[],
@@ -227,12 +327,35 @@ export default function App() {
     setRetirements(nextRetirements);
     setLogs(nextLogs);
     setNotifications(nextNotifications);
-    saveStoredData({
+
+    const payload = {
       advances: nextAdvances,
       retirements: nextRetirements,
       logs: nextLogs,
       notifications: nextNotifications
-    });
+    };
+    const userId = authUser?.id;
+    if (shouldUseGlobalQueue(authUserRole)) {
+      saveStoredData(payload);
+      if (userId) {
+        saveStoredData(payload, userId);
+      }
+      return;
+    }
+
+    // For personal initiator flows, keep personal data private while syncing changes to the shared global queue.
+    const globalData = getStoredData();
+    const mergedGlobal = {
+      advances: mergeById(globalData.advances, nextAdvances),
+      retirements: mergeById(globalData.retirements, nextRetirements),
+      logs: mergeLogs(globalData.logs, nextLogs),
+      notifications: mergeNotifications(globalData.notifications, nextNotifications)
+    };
+
+    saveStoredData(mergedGlobal);
+    if (userId) {
+      saveStoredData(payload, userId);
+    }
   };
 
   // Switch Profiles helper
@@ -254,26 +377,74 @@ export default function App() {
       role: userRole,
       action: 'Switched Active Identity Panel',
       date: timestamp,
-      comment: `Identity switched in sandbox panel to act as department role: ${userRole}`
+      comment: `Identity switched in sandbox panel (acting identity).`
     };
 
     const nextLogs = [newLog, ...logs];
     handleSaveData(advances, retirements, nextLogs, notifications);
   };
 
+  function mapPortalIdentityToRole(portalIdentity?: string): UserRole {
+    const portalRoleMap: Record<string, UserRole> = {
+      'Initiator': UserRole.ADMIN_OFFICER,
+      'IT Support': UserRole.SYSTEM_ADMIN,
+      'Line Manager': UserRole.HEAD_OF_ADMIN,
+      'Internal Control': UserRole.INTERNAL_CONTROL,
+      'Executive Manager': UserRole.EXECUTIVE_DIRECTOR,
+      'Executive Director': UserRole.EXECUTIVE_DIRECTOR,
+      'Finance': UserRole.FINANCE_OFFICER
+    };
+
+    return portalIdentity && portalRoleMap[portalIdentity]
+      ? portalRoleMap[portalIdentity]
+      : UserRole.ADMIN_OFFICER;
+  }
+
+  function parseRoleString(role?: string): UserRole | undefined {
+    if (!role) return undefined;
+    const normalized = role.trim().toLowerCase();
+    if (Object.values(UserRole).map(v => v.toLowerCase()).includes(normalized)) {
+      return Object.values(UserRole).find(v => v.toLowerCase() === normalized) as UserRole;
+    }
+    if (normalized.includes('head') && (normalized.includes('admin') || normalized.includes('administration'))) return UserRole.HEAD_OF_ADMIN;
+    if (normalized.includes('internal')) return UserRole.INTERNAL_CONTROL;
+    if (normalized.includes('executive')) return UserRole.EXECUTIVE_DIRECTOR;
+    if (normalized.includes('finance')) return UserRole.FINANCE_OFFICER;
+    if (normalized.includes('system') || normalized.includes('it')) return UserRole.SYSTEM_ADMIN;
+    if (normalized.includes('initiator') || normalized.includes('admin officer')) return UserRole.ADMIN_OFFICER;
+    return undefined;
+  }
+
+  const getDefaultTabForRole = (role: UserRole) => {
+    switch (role) {
+      case UserRole.SYSTEM_ADMIN:
+        return 'cms';
+      case UserRole.FINANCE_OFFICER:
+        return 'reports';
+      case UserRole.INTERNAL_CONTROL:
+        return 'audit';
+      default:
+        return 'dashboard';
+    }
+  };
+
   const handleLoginSuccess = (user: AuthUser) => {
-    setAuthUser(user);
+    const parsed = parseRoleString(user.role as string | undefined);
+    const userRole = parsed || (user.portal_identity ? mapPortalIdentityToRole(user.portal_identity) : UserRole.ADMIN_OFFICER);
+    const normalizedUser = { ...user, role: userRole };
+    const userId = normalizedUser.id;
+
+    setAuthUser(normalizedUser);
     setIsLoggedIn(true);
     localStorage.setItem('ca_session_logged_in', 'true');
-    authService.setUser(user);
-    setProfileFirstName(user.first_name);
-    setProfileLastName(user.last_name);
-    setProfileDepartment(user.department || 'Administration');
-    setProfilePictureUrl(user.profile_picture_url || '');
+    firebaseAuthService.setUser(normalizedUser);
+    setProfileFirstName(normalizedUser.first_name);
+    setProfileLastName(normalizedUser.last_name);
+    setProfileDepartment(normalizedUser.department || 'Administration');
+    setProfilePictureUrl(normalizedUser.profile_picture_url || '');
 
-    const userRole = Object.values(UserRole).includes(user.role as UserRole)
-      ? (user.role as UserRole)
-      : UserRole.ADMIN_OFFICER;
+    setActiveTab(getDefaultTabForRole(userRole));
+
     const userName = `${user.first_name} ${user.last_name}`;
     const timestamp = getTimestampString();
 
@@ -288,28 +459,96 @@ export default function App() {
       comment: `Session initialized securely by ${userName} (${userRole})`
     };
 
-    const data = getStoredData();
-    const nextLogs = [newLog, ...(data.logs.length > 0 ? data.logs : logs)];
+    const data = shouldUseGlobalQueue(userRole)
+      ? getStoredData()
+      : getStoredData(userId);
+
+    setAdvances(data.advances);
+    setRetirements(data.retirements);
+    setLogs(data.logs);
+    setNotifications(data.notifications);
+
+    const nextLogs = [newLog, ...data.logs];
     setLogs(nextLogs);
-    saveStoredData({ logs: nextLogs });
+    if (shouldUseGlobalQueue(userRole)) {
+      const existingGlobal = getStoredData();
+      const mergedGlobalLogs = mergeLogs(existingGlobal.logs, nextLogs);
+      saveStoredData({ logs: mergedGlobalLogs });
+      if (userId) {
+        saveStoredData({ logs: nextLogs }, userId);
+      }
+    } else if (userId) {
+      saveStoredData({ logs: nextLogs }, userId);
+    }
   };
 
-  const handleLogout = () => {
-    authService.logout();
+  const handleLogout = async () => {
+    await firebaseAuthService.logout();
     setIsLoggedIn(false);
     setAuthUser(null);
     localStorage.setItem('ca_session_logged_in', 'false');
+    localStorage.removeItem('auth_user');
+    localStorage.removeItem('ca_session_user_idx');
   };
+
+  const handleProfilePictureClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleProfilePictureChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !authUser) {
+      console.warn('[Profile Picture] Missing file or authUser. File:', !!file, 'AuthUser:', !!authUser);
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setProfilePicturePreview(previewUrl);
+    setProfileSaveStatus('Uploading profile picture...');
+
+    try {
+      const uploadedUrl = await firebaseAuthService.uploadProfilePicture(authUser.id, file);
+      const updatedUser = await firebaseAuthService.updateProfile({ profilePictureUrl: uploadedUrl });
+      setAuthUser(updatedUser);
+      setProfilePictureUrl(uploadedUrl);
+      setProfilePicturePreview('');
+      setProfileSaveStatus('Profile picture updated successfully');
+      setTimeout(() => setProfileSaveStatus(null), 3000);
+    } catch (error: any) {
+      console.error('[Profile Picture] Upload failed:', error);
+      setProfileSaveStatus(error?.message || 'Upload failed');
+      setTimeout(() => setProfileSaveStatus(null), 4000);
+    }
+  };
+
+
+  // Auto-redirect from unauthorized tabs
+  React.useEffect(() => {
+    if (activeTab === 'cms' && authUserRole !== UserRole.SYSTEM_ADMIN) {
+      setActiveTab('dashboard');
+    }
+    if (activeTab === 'config' && authUserRole !== UserRole.SYSTEM_ADMIN) {
+      setActiveTab('dashboard');
+    }
+    if (activeTab === 'audit' && authUserRole !== UserRole.INTERNAL_CONTROL && authUserRole !== UserRole.SYSTEM_ADMIN) {
+      setActiveTab('dashboard');
+    }
+    if (activeTab === 'reports' && authUserRole !== UserRole.FINANCE_OFFICER && authUserRole !== UserRole.SYSTEM_ADMIN) {
+      setActiveTab('dashboard');
+    }
+  }, [activeTab, authUserRole]);
 
   React.useEffect(() => {
     async function fetchCurrentUser() {
-      if (authService.isAuthenticated() && !authUser) {
+      if (firebaseAuthService.isAuthenticated() && !authUser) {
         try {
-          const user = await authService.getCurrentUser();
+          const user = await firebaseAuthService.getCurrentUser();
           setAuthUser(user);
           setIsLoggedIn(true);
         } catch (error) {
-          authService.logout();
+          await firebaseAuthService.logout();
           setIsLoggedIn(false);
           setAuthUser(null);
         }
@@ -613,7 +852,7 @@ export default function App() {
 
     handleSaveData(nextAdvances, retirements, nextLogs, nextNotifs);
     setIsInitiatingAdvance(false);
-    alert(newRequest.currentStatus === RequestStatus.DRAFT ? 'Draft saved!' : 'Funding request submitted to Head of Administration approval!');
+    alert(newRequest.currentStatus === RequestStatus.DRAFT ? 'Draft saved!' : 'Funding request submitted to Line Manager approval!');
   };
 
   // 2. CASH ADVANCE REQUEST Approval Action flow routing
@@ -671,7 +910,7 @@ export default function App() {
         nextStatus = RequestStatus.REJECTED; // Goes to reject so initiator can handle corrections
       } else if (action === 'Return to Admin') {
         nextStatus = RequestStatus.PENDING_HEAD_OF_ADMIN_RELEASE;
-      } else if (action === 'Pay' && paymentMeta) {
+      } else if (action === 'Pay') {
         nextStatus = RequestStatus.PAID;
       }
 
@@ -695,6 +934,10 @@ export default function App() {
       // Set date tracker if sending to finance for automated reminders simulation trigger
       if (action === 'Send to Finance') {
         updatedRequest.daysAwaitingPaymentSince = '2026-06-12';
+      }
+
+      if (action === 'Pay') {
+        delete updatedRequest.daysAwaitingPaymentSince;
       }
 
       return updatedRequest;
@@ -736,7 +979,7 @@ export default function App() {
     } else if (action === 'Approve') {
       let notifyWho: UserRole = UserRole.HEAD_OF_ADMIN;
       if (targetReq.currentStatus === RequestStatus.PENDING_INTERNAL_CONTROL) notifyWho = UserRole.INTERNAL_CONTROL;
-      if (targetReq.currentStatus === RequestStatus.PENDING_EXECUTIVE_OFFICE) notifyWho = UserRole.EXECUTIVE_OFFICE;
+      if (targetReq.currentStatus === RequestStatus.PENDING_EXECUTIVE_OFFICE) notifyWho = UserRole.EXECUTIVE_DIRECTOR;
       if (targetReq.currentStatus === RequestStatus.PENDING_HEAD_OF_ADMIN_RELEASE) notifyWho = UserRole.HEAD_OF_ADMIN;
 
       const appNotf = triggerNotification(
@@ -755,15 +998,20 @@ export default function App() {
       );
       nextNotifs = [finNotif, ...nextNotifs];
     } else if (action === 'Pay') {
-      // Mark as paid alerts Initiator, Head of Admin, and Internal Control
+      // Mark as paid alerts Initiator, Line Manager and Auditor (Internal Control).
+      // Do not send the status-change notification back to the user who performed the action (e.g. Finance).
       const proofLabel = paymentMeta?.proofOfPaymentName ? ` [Proof attached: ${paymentMeta.proofOfPaymentName}]` : '';
-      const adminProofLabel = paymentMeta?.proofOfPaymentName 
-        ? `, and dynamic proof of payment metadata (${paymentMeta.proofOfPaymentName}) has been filed to Admin desktop.` 
-        : '.';
-      const infInitiator = triggerNotification(UserRole.ADMIN_OFFICER, `DISBURSED: Your request ${selectedRequestId} for ₦${targetReq.amountRequested} has been Paid by Finance${proofLabel}. Reference: ${paymentMeta?.paymentReference}`, selectedRequestId, 'status_change');
-      const infHOA = triggerNotification(UserRole.HEAD_OF_ADMIN, `DISBURSED & REVIEW PROOF: Request ${selectedRequestId} settled${adminProofLabel} Reference: ${paymentMeta?.paymentReference}`, selectedRequestId, 'status_change');
-      const infIC = triggerNotification(UserRole.INTERNAL_CONTROL, `DISBURSED: Request ${selectedRequestId} settled${proofLabel}. Reference: ${paymentMeta?.paymentReference}`, selectedRequestId, 'status_change');
-      nextNotifs = [infInitiator, infHOA, infIC, ...nextNotifs];
+      const recipients: { role: UserRole; message: string }[] = [
+        { role: UserRole.ADMIN_OFFICER, message: `DISBURSED: Your request ${selectedRequestId} for ₦${targetReq.amountRequested} has been Paid by Finance${proofLabel}. Reference: ${paymentMeta?.paymentReference}` },
+        { role: UserRole.HEAD_OF_ADMIN, message: `PAYMENT NOTIFICATION: Cash Advance ${selectedRequestId} for ₦${targetReq.amountRequested} has been disbursed by Finance. Reference: ${paymentMeta?.paymentReference}` },
+        { role: UserRole.INTERNAL_CONTROL, message: `DISBURSED: Request ${selectedRequestId} settled${proofLabel}. Reference: ${paymentMeta?.paymentReference}` }
+      ];
+
+      const createdNotifs = recipients
+        .filter(r => r.role !== currentUser.role)
+        .map(r => triggerNotification(r.role, r.message, selectedRequestId, 'status_change'));
+
+      nextNotifs = [...createdNotifs, ...nextNotifs];
     }
 
     if (action === 'Pay') {
@@ -815,7 +1063,7 @@ export default function App() {
       expenseDetails: retMeta.expenseDetails || [],
       receiptName: retMeta.receiptName,
       comment: retMeta.comment,
-      currentStatus: RetirementStatus.PENDING_HEAD_OF_ADMIN, // submits to head of admin verifications
+      currentStatus: RetirementStatus.PENDING_HEAD_OF_ADMIN, // submits to Line Manager verifications
       approvalHistory: retMeta.approvalHistory || []
     };
 
@@ -831,7 +1079,7 @@ export default function App() {
       comment: `Utilized: ₦${newRetirement.amountUtilized}, Refund returned balance: ₦${newRetirement.balanceReturned}`
     };
 
-    // Notification to Head of admin
+    // Notification to Line Manager
     const hoaAlert = triggerNotification(
       UserRole.HEAD_OF_ADMIN,
       `RETIREMENT CLAIM: Staff filed retirement claim ${nextId} against outstanding advance ${newRetirement.cashAdvanceRef}. Auditing required.`,
@@ -945,14 +1193,14 @@ export default function App() {
       if (nextRetObj.currentStatus === RetirementStatus.PENDING_INTERNAL_CONTROL) {
         const hAlert = triggerNotification(
           UserRole.INTERNAL_CONTROL,
-          `RETIREMENT REVIEWS: Claim folder ${selectedRetirementId} passed Head of Admin audit. Verify receipts.`,
+          `RETIREMENT REVIEWS: Claim folder ${selectedRetirementId} passed Line Manager audit. Verify receipts.`,
           activeRet.cashAdvanceRef,
           'approval_required'
         );
         nextNotifs = [hAlert, ...nextNotifs];
       } else if (nextRetObj.currentStatus === RetirementStatus.PENDING_EXECUTIVE_OFFICE) {
         const iAlert = triggerNotification(
-          UserRole.EXECUTIVE_OFFICE,
+          UserRole.EXECUTIVE_DIRECTOR,
           `RETIREMENT REVIEWS: Claim folder ${selectedRetirementId} passed Compliance. Sign off.`,
           activeRet.cashAdvanceRef,
           'approval_required'
@@ -1056,15 +1304,15 @@ export default function App() {
 
       let nextNotifs = [...notifications];
       itemsAwaiting.forEach(a => {
-        // Escalate to Head of Administration and Executive Office
+        // Escalate to Line Manager and Executive Director
         const hoaAlert = triggerNotification(
           UserRole.HEAD_OF_ADMIN,
-          `ESCALATION: Awaiting payment request ${a.referenceNumber} has remained unresolved for over 5 days. Urgent intervention recommended.`,
+          `ESCALATION: Awaiting payment request ${a.referenceNumber} has remained unresolved for over 5 days. Urgent Line Manager intervention recommended.`,
           a.referenceNumber,
           'escalation'
         );
         const eoAlert = triggerNotification(
-          UserRole.EXECUTIVE_OFFICE,
+          UserRole.EXECUTIVE_DIRECTOR,
           `ESCALATION: Awaiting payment request ${a.referenceNumber} has remained unresolved for over 5 days. Urgent intervention recommended.`,
           a.referenceNumber,
           'escalation'
@@ -1080,11 +1328,11 @@ export default function App() {
         role: UserRole.SYSTEM_ADMIN,
         action: 'Escalated Overdue Payment Reminders (>5 Days)',
         date: timestamp,
-        comment: 'High priority alerts issued directly to HoA and Executive Directors desks.'
+        comment: 'High priority alerts issued directly to Line Manager and Executive Directors desks.'
       };
 
       handleSaveData(advances, retirements, [newLog, ...logs], nextNotifs);
-      alert('Simulation completed! Escallated alerts dispatched for Head of Admin and Executive Office feed.');
+      alert('Simulation completed! Escalated alerts dispatched for Line Manager and Executive Director feed.');
     }
   };
 
@@ -1181,7 +1429,7 @@ export default function App() {
 
   const handlePurgeAdvances = () => {
     setAdvances([]);
-    saveStoredData({ advances: [] });
+    saveStoredData({ advances: [] }, authUser?.id);
     
     const nextLogs: AuditLogEntry[] = [{
       id: `sys-${Date.now()}`,
@@ -1193,12 +1441,12 @@ export default function App() {
       date: new Date().toISOString().replace('T', ' ').substring(0, 16)
     }, ...logs];
     setLogs(nextLogs);
-    saveStoredData({ logs: nextLogs });
+    saveStoredData({ logs: nextLogs }, authUser?.id);
   };
 
   const handlePurgeRetirements = () => {
     setRetirements([]);
-    saveStoredData({ retirements: [] });
+    saveStoredData({ retirements: [] }, authUser?.id);
 
     const nextLogs: AuditLogEntry[] = [{
       id: `sys-${Date.now()}`,
@@ -1210,15 +1458,34 @@ export default function App() {
       date: new Date().toISOString().replace('T', ' ').substring(0, 16)
     }, ...logs];
     setLogs(nextLogs);
-    saveStoredData({ logs: nextLogs });
+    saveStoredData({ logs: nextLogs }, authUser?.id);
   };
 
   if (!isLoggedIn) {
-    return <ModernAuth onLoginSuccess={handleLoginSuccess} />;
+    return (
+      <ModernAuth
+        onLoginSuccess={handleLoginSuccess}
+        customBackgroundUrl={systemSettings.customBackgroundUrl}
+        customLogoUrl={systemSettings.customLogoUrl}
+        customFrameColor={systemSettings.customFrameColor}
+      />
+    );
   }
 
+  // Compute desktop header signout button visibility
+  const showDesktopSignOut = authUser && isLoggedIn;
+
   return (
-    <div id="full-app-root" className="min-h-screen bg-slate-100 flex flex-col font-sans select-none antialiased">
+    <div
+      id="full-app-root"
+      className="min-h-screen flex flex-col font-sans select-none antialiased portal-dashboard"
+      style={{
+        background: 'var(--color-off-white)',
+        '--cms-frame-bg': systemSettings.customFrameColor || '#ffffff',
+        '--cms-frame-border': systemSettings.customFrameColor || '#cbd5e1',
+        '--cms-table-border': systemSettings.customTableColor || '#cbd5e1'
+      } as React.CSSProperties}
+    >
       
 
 
@@ -1226,129 +1493,154 @@ export default function App() {
       <div className="flex-1 flex flex-col lg:flex-row min-h-0 min-w-0">
         
         {/* Sleek Design Theme Sidebar Tab Panel (Desktop only) */}
-        <aside className="w-64 bg-slate-900 text-slate-300 hidden lg:flex flex-col border-r border-slate-800 shrink-0 print:hidden select-none">
+          <aside className="w-64 text-slate-300 hidden lg:flex flex-col border-r border-slate-700/50 shrink-0 print:hidden select-none shadow-2xl" style={{background: 'linear-gradient(180deg, var(--color-deep-forest) 0%, var(--color-dark-green) 100%)'}}>
           {/* Logo Portion */}
-          <div className="p-6 border-b border-slate-800">
+          <div className="p-6 border-b border-slate-700/30" style={{background: 'var(--color-off-white, #EFEFF1)'}}>
             <div className="flex items-center gap-3">
               <div className="h-8 flex items-center justify-center shrink-0">
-                <img src="https://imgur.com/Om0LsC2.png" alt="Company Logo" className="h-full object-contain" referrerPolicy="no-referrer" />
+                <img
+                  src={systemSettings.customLogoUrl?.trim() || 'https://i.imgur.com/Om0LsC2.png'}
+                  alt="Company Logo"
+                  className="h-full object-contain"
+                  referrerPolicy="no-referrer"
+                  onError={(event) => {
+                    const target = event.currentTarget as HTMLImageElement;
+                    target.src = 'https://i.imgur.com/Om0LsC2.png';
+                  }}
+                />
               </div>
-              <div className="min-w-0">
-                <h1 className="font-extrabold text-slate-100 text-sm tracking-tight leading-none uppercase truncate">{systemSettings.customLogoText}</h1>
-                <p className="text-[9px] text-slate-400 mt-1 uppercase tracking-widest font-mono">Internal Portal</p>
-              </div>
+                <div className="min-w-0">
+                  <h1 className="font-extrabold text-sm tracking-tight leading-none uppercase truncate" style={{color: 'var(--color-deep-forest)'}}>{systemSettings.customLogoText || 'INTERNAL MEMO'}</h1>
+                  <p className="text-[9px] mt-1 uppercase tracking-widest font-mono" style={{color: 'var(--color-gold-bronze)'}}>APPROVAL PORTAL</p>
+                </div>
             </div>
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex-1 py-6 space-y-1 overflow-y-auto">
-            <div className="px-6 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">Main Workspaces</div>
+          <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
+            <div className="px-3 pb-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Main Workspaces</div>
             
             <button
               id="sidebar-tab-btn-dashboard"
               onClick={() => { setActiveTab('dashboard'); handleSetStatusFilter(null); }}
-              className={`w-full flex items-center px-6 py-2.5 space-x-3 text-left transition-all duration-155 border-l-4 cursor-pointer font-sans text-xs font-semibold ${
+              className={`w-full flex items-center px-4 py-3 space-x-3 text-left transition-all duration-200 border-l-4 cursor-pointer font-sans text-xs font-semibold rounded-lg mx-0.5 ${
                 activeTab === 'dashboard'
-                  ? 'bg-white/10 border-blue-500 text-white font-bold'
-                  : 'border-transparent text-slate-400 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-[#EFEFF1] border-[#3A4645] text-[#A68D63] shadow-lg shadow-[#3A4645]/20'
+                  : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 hover:border-slate-600'
               }`}
             >
-              <TrendingUp className="w-4.5 h-4.5 text-blue-400 shrink-0" />
+              <TrendingUp className="w-4.5 h-4.5 text-[#A68D63] shrink-0" />
               <span>Overview Dashboard</span>
             </button>
 
             <button
               id="sidebar-tab-btn-requests"
               onClick={() => { setActiveTab('requests'); setSelectedRequestId(null); setIsInitiatingAdvance(false); }}
-              className={`w-full flex items-center px-6 py-2.5 space-x-3 text-left transition-all duration-155 border-l-4 cursor-pointer font-sans text-xs font-semibold ${
+              className={`w-full flex items-center px-4 py-3 space-x-3 text-left transition-all duration-200 border-l-4 cursor-pointer font-sans text-xs font-semibold rounded-lg mx-0.5 ${
                 activeTab === 'requests'
-                  ? 'bg-white/10 border-blue-500 text-white font-bold'
-                  : 'border-transparent text-slate-400 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-[#EFEFF1] border-[#3A4645] text-[#A68D63] shadow-lg shadow-[#3A4645]/20'
+                  : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 hover:border-slate-600'
               }`}
             >
-              <FileText className="w-4.5 h-4.5 text-blue-400 shrink-0" />
+              <FileText className="w-4.5 h-4.5 text-[#A68D63] shrink-0" />
               <span>Cash Advance Memos</span>
             </button>
 
             <button
               id="sidebar-tab-btn-retirement"
               onClick={() => { setActiveTab('retirement'); setSelectedRetirementId(null); setIsInitiatingRetirement(false); }}
-              className={`w-full flex items-center px-6 py-2.5 space-x-3 text-left transition-all duration-155 border-l-4 cursor-pointer font-sans text-xs font-semibold ${
+              className={`w-full flex items-center px-4 py-3 space-x-3 text-left transition-all duration-200 border-l-4 cursor-pointer font-sans text-xs font-semibold rounded-lg mx-0.5 ${
                 activeTab === 'retirement'
-                  ? 'bg-white/10 border-blue-500 text-white font-bold'
-                  : 'border-transparent text-slate-400 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-[#EFEFF1] border-[#3A4645] text-[#A68D63] shadow-lg shadow-[#3A4645]/20'
+                  : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 hover:border-slate-600'
               }`}
             >
-              <Archive className="w-4.5 h-4.5 text-blue-400 shrink-0" />
+              <Archive className="w-4.5 h-4.5 text-[#A68D63] shrink-0" />
               <span>Fund Retirements</span>
             </button>
 
-            <button
-              id="sidebar-tab-btn-reports"
-              onClick={() => setActiveTab('reports')}
-              className={`w-full flex items-center px-6 py-2.5 space-x-3 text-left transition-all duration-155 border-l-4 cursor-pointer font-sans text-xs font-semibold ${
-                activeTab === 'reports'
-                  ? 'bg-white/10 border-blue-500 text-white font-bold'
-                  : 'border-transparent text-slate-400 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              <CreditCard className="w-4.5 h-4.5 text-blue-400 shrink-0" />
-              <span>Accounts Ledger</span>
-            </button>
-
-            <button
-              id="sidebar-tab-btn-audit"
-              onClick={() => setActiveTab('audit')}
-              className={`w-full flex items-center px-6 py-2.5 space-x-3 text-left transition-all duration-155 border-l-4 cursor-pointer font-sans text-xs font-semibold ${
-                activeTab === 'audit'
-                  ? 'bg-white/10 border-blue-500 text-white font-bold'
-                  : 'border-transparent text-slate-400 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              <ShieldCheck className="w-4.5 h-4.5 text-blue-400 shrink-0" />
-              <span>Audit Trail Logs</span>
-            </button>
-
-            <div className="pt-4 space-y-1">
-              <div className="px-6 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">Administration</div>
-              
+            {(authUserRole === UserRole.FINANCE_OFFICER || authUserRole === UserRole.SYSTEM_ADMIN) && (
               <button
-                id="sidebar-tab-btn-crm"
-                onClick={() => setActiveTab('crm')}
-                className={`w-full flex items-center px-6 py-2 px-3 text-left transition-all duration-155 border-l-4 cursor-pointer font-sans text-xs font-semibold ${
-                  activeTab === 'crm'
-                    ? 'bg-white/10 border-blue-500 text-white font-bold'
-                    : 'border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                id="sidebar-tab-btn-reports"
+                onClick={() => setActiveTab('reports')}
+                className={`w-full flex items-center px-4 py-3 space-x-3 text-left transition-all duration-200 border-l-4 cursor-pointer font-sans text-xs font-semibold rounded-lg mx-0.5 ${
+                  activeTab === 'reports'
+                    ? 'bg-[#EFEFF1] border-[#3A4645] text-[#A68D63] shadow-lg shadow-[#3A4645]/20'
+                    : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 hover:border-slate-600'
                 }`}
               >
-                <Users className="w-4.5 h-4.5 text-blue-400 shrink-0" />
-                <span>CRM Email & Directory</span>
+                <CreditCard className="w-4.5 h-4.5 text-[#A68D63] shrink-0" />
+                <span>Accounts Ledger</span>
+              </button>
+            )}
+            {(authUserRole === UserRole.INTERNAL_CONTROL || authUserRole === UserRole.SYSTEM_ADMIN) && (
+              <button
+                id="sidebar-tab-btn-audit"
+                onClick={() => setActiveTab('audit')}
+                className={`w-full flex items-center px-4 py-3 space-x-3 text-left transition-all duration-200 border-l-4 cursor-pointer font-sans text-xs font-semibold rounded-lg mx-0.5 ${
+                  activeTab === 'audit'
+                    ? 'bg-[#EFEFF1] border-[#3A4645] text-[#A68D63] shadow-lg shadow-[#3A4645]/20'
+                    : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 hover:border-slate-600'
+                }`}
+              >
+                <ShieldCheck className="w-4.5 h-4.5 text-[#A68D63] shrink-0" />
+                <span>Audit Trail Logs</span>
+              </button>
+            )}
+
+            {authUserRole === UserRole.SYSTEM_ADMIN && (
+            <div className="pt-6 mt-6 space-y-1 border-t border-slate-700/30">
+              <div className="px-3 pb-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">IT Support Administration</div>
+              
+              <button
+                id="sidebar-tab-btn-cms"
+                onClick={() => setActiveTab('cms')}
+                className={`w-full flex items-center px-4 py-3 space-x-3 text-left transition-all duration-200 border-l-4 cursor-pointer font-sans text-xs font-semibold rounded-lg mx-0.5 ${
+                  activeTab === 'cms'
+                    ? 'bg-[#EFEFF1] border-[#3A4645] text-[#A68D63] shadow-lg shadow-[#3A4645]/20'
+                    : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 hover:border-slate-600'
+                }`}
+              >
+                <Users className="w-4.5 h-4.5 text-[#A68D63] shrink-0" />
+                <span>CMS Portal</span>
               </button>
 
               <button
                 id="sidebar-tab-btn-config"
                 onClick={() => setActiveTab('config')}
-                className={`w-full flex items-center px-6 py-2 px-3 text-left transition-all duration-155 border-l-4 cursor-pointer font-sans text-xs font-semibold ${
+                className={`w-full flex items-center px-4 py-3 space-x-3 text-left transition-all duration-200 border-l-4 cursor-pointer font-sans text-xs font-semibold rounded-lg mx-0.5 ${
                   activeTab === 'config'
-                    ? 'bg-white/10 border-blue-500 text-white font-bold'
-                    : 'border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                    ? 'bg-[#EFEFF1] border-[#3A4645] text-[#A68D63] shadow-lg shadow-[#3A4645]/20'
+                    : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 hover:border-slate-600'
                 }`}
               >
-                <ShieldAlert className="w-4.5 h-4.5 text-blue-400 shrink-0 animate-pulse" />
+                <ShieldAlert className="w-4.5 h-4.5 text-[#A68D63] shrink-0 animate-pulse" />
                 <span>Internal Memo Configuration</span>
               </button>
             </div>
+            )}
           </nav>
 
           {/* Profile Section */}
-          <div className="p-4 bg-slate-950 border-t border-slate-850 mt-auto">
+          <div className="p-4 bg-gradient-to-r from-slate-800/50 to-slate-900 border-t border-slate-700/30 mt-auto">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs uppercase shadow-sm shrink-0">
-                {currentUser.name.slice(0, 2)}
-              </div>
+              <button
+                type="button"
+                onClick={handleProfilePictureClick}
+                className="relative w-9 h-9 rounded-full overflow-hidden shrink-0 border border-blue-400/50 shadow-lg shadow-blue-500/20 bg-gradient-to-br from-blue-600 to-purple-600 transition-all hover:shadow-blue-500/40"
+                title="Change profile picture"
+              >
+                {displayProfileAvatar ? (
+                  <img src={displayProfileAvatar} alt={currentUser.name} className="w-full h-full object-cover" onError={(event) => { (event.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white uppercase">
+                    {currentUser.name.slice(0, 2)}
+                  </div>
+                )}
+              </button>
               <div className="text-xs min-w-0">
-                <p className="font-bold text-slate-100 truncate">{currentUser.name}</p>
-                <p className="text-[10px] text-slate-450 truncate tracking-wide font-mono leading-none">{currentUser.role}</p>
+                <p className="font-semibold text-slate-50 truncate">{currentUser.name}</p>
+                <p className="text-[10px] text-slate-400 truncate tracking-wide font-mono leading-none">{currentUser.role}</p>
               </div>
             </div>
           </div>
@@ -1356,42 +1648,49 @@ export default function App() {
 
         {/* Right Content Workspace container */}
         <div className="flex-1 flex flex-col min-h-screen bg-slate-100 min-w-0">
-          
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleProfilePictureChange}
+          />
           {/* Main Top Header bar */}
-          <header id="app-primary-header" className="bg-white border-b border-slate-200 h-14 md:h-16 flex items-center justify-between px-4 md:px-6 sticky top-0 z-40 print:hidden shadow-xs">
+          <header id="app-primary-header" className="border min-h-[56px] md:h-16 flex flex-wrap items-center justify-between gap-3 px-4 md:px-6 sticky top-0 z-40 print:hidden shadow-black/30 shadow-xs" style={{background: 'var(--color-dark-green)'}}>
             
             {/* Left Header Title / Toggle menu */}
             <div className="flex items-center gap-2 md:gap-3">
               <button
                 id="mobile-menu-trigger-btn"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="p-2 text-slate-600 hover:text-blue-700 hover:bg-slate-50 border border-slate-200 rounded lg:hidden transition-all duration-150 active:scale-95"
+                className="p-2 text-white hover:text-white hover:bg-blue-700 border border-blue-700 rounded lg:hidden transition-all duration-150 active:scale-95"
               >
                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
-              
-              <div className="lg:hidden flex items-center gap-1 flex-1 min-w-0">
-                <div className="h-6 md:h-7 flex items-center justify-center shrink-0">
-                    <img src="https://imgur.com/8PoFnhE.png" alt="Logo" className="h-full object-contain" referrerPolicy="no-referrer" />
-              </div>
+            </div>
 
-              <div className="hidden lg:flex items-center space-x-2">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest font-mono">Departmental Workspace:</span>
-                <h2 className="text-sm md:text-base font-black text-slate-800 uppercase tracking-tight">
+            <div className="flex-1 flex items-center justify-center">
+              <div className="min-w-0 text-center">
+                <p className="truncate text-sm md:text-base font-semibold" style={{color: 'var(--color-off-white)'}}>
+                  {activeTab === 'cms' ? 'CMS Portal' : 'Memo Approval Portal'}
+                </p>
+                <p className="truncate text-[11px] leading-none" style={{color: 'var(--color-light-gold)'}}>
                   {activeTab === 'dashboard' ? 'Overview Operations' :
-                   activeTab === 'requests' ? 'Cash Advance Allocation Memo Desk' :
+                   activeTab === 'requests' ? 'Cash Advance Allocation' :
                    activeTab === 'retirement' ? 'Audit Expense & Retirements' :
-                   activeTab === 'reports' ? 'Corporate General Accounts Ledger' :
+                   activeTab === 'reports' ? 'Corporate General Accounts' :
                    activeTab === 'audit' ? 'Expenditure Compliance Audit Logs' :
+                   activeTab === 'cms' ? 'CMS and IT Support Workspace' :
                    'Internal Memo Simulator Desk'}
-                </h2>
+                </p>
               </div>
             </div>
 
+            
+
             {/* Right Header Controls */}
-            <div className="flex items-center gap-2 md:gap-4">
+            <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
               
-              {/* Live Notifications bell */}
               <NotificationBell
                 notifications={notifications}
                 advances={advances}
@@ -1402,27 +1701,34 @@ export default function App() {
                 onSendCustomAlert={handleSendCustomAlert}
               />
 
-              {/* Light/Dark Mode Switcher */}
-              <button
-                id="portal-theme-mode-toggle"
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 dark:hover:text-white rounded-lg transition-all cursor-pointer flex items-center justify-center border border-slate-200 dark:border-slate-700 active:scale-95"
-                title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-              >
-                {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
-              </button>
-
               <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden md:block"></div>
 
-              {/* Profile display widget summary */}
               <div className="hidden md:flex items-center gap-2.5">
                 <div className="text-right">
-                  <span className="text-xs font-bold block text-slate-800 dark:text-slate-100 leading-none">{currentUser.name}</span>
-                  <span className="text-[9px] font-mono font-semibold text-slate-400 block mt-1 uppercase leading-none">{currentUser.role}</span>
+                  <span className="text-xs font-bold block leading-none truncate" style={{color: 'var(--color-deep-forest)'}}>{currentUser.name}</span>
+                  <span className="text-[9px] font-mono font-semibold block mt-1 uppercase leading-none truncate" style={{color: 'var(--color-light-gold)'}}>{currentUser.role}</span>
                 </div>
-                <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-extrabold flex items-center justify-center text-xs uppercase shadow-xs">
-                  {currentUser.name.slice(0, 2)}
-                </div>
+                <button
+                  type="button"
+                  onClick={handleProfilePictureClick}
+                  className="relative w-8 h-8 rounded-full overflow-hidden shrink-0 border shadow-xs transition-all"
+                  style={{background: 'var(--color-gold-bronze)', borderColor: 'var(--color-light-gold)'}}
+                  title="Change profile picture"
+                >
+                  {displayProfileAvatar ? (
+                    <img
+                      src={displayProfileAvatar}
+                      alt={currentUser.name}
+                      className="w-full h-full object-cover"
+                      onError={(event) => { (event.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-xs font-extrabold text-white uppercase">
+                      {currentUser.name.slice(0, 2)}
+                    </div>
+                  )}
+                  <span className="absolute -right-1 -bottom-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-blue-600 text-[10px] font-bold border border-blue-200">+</span>
+                </button>
                 <button
                   id="app-header-logout-trigger"
                   onClick={handleLogout}
@@ -1434,7 +1740,6 @@ export default function App() {
               </div>
 
             </div>
-          </div>
           </header>
 
       {/* Mobile responsive slide dropdown Menu */}
@@ -1461,6 +1766,7 @@ export default function App() {
           >
             Fund Retirements
           </button>
+          {(authUserRole === UserRole.FINANCE_OFFICER || authUserRole === UserRole.SYSTEM_ADMIN) && (
           <button
             id="mob-tab-reports"
             onClick={() => { setActiveTab('reports'); setMobileMenuOpen(false); }}
@@ -1468,6 +1774,8 @@ export default function App() {
           >
             Accounts Ledger
           </button>
+          )}
+          {(authUserRole === UserRole.INTERNAL_CONTROL || authUserRole === UserRole.SYSTEM_ADMIN) && (
           <button
             id="mob-tab-audit"
             onClick={() => { setActiveTab('audit'); setMobileMenuOpen(false); }}
@@ -1475,13 +1783,16 @@ export default function App() {
           >
             Audit Trail
           </button>
+          )}
           
+          {authUserRole === UserRole.SYSTEM_ADMIN && (
+          <>
           <button
-            id="mob-tab-crm"
-            onClick={() => { setActiveTab('crm'); setMobileMenuOpen(false); }}
-            className={`p-3 rounded-lg font-bold text-sm text-left transition-colors active:scale-95 ${activeTab === 'crm' ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'}`}
+            id="mob-tab-cms"
+            onClick={() => { setActiveTab('cms'); setMobileMenuOpen(false); }}
+            className={`p-3 rounded-lg font-bold text-sm text-left transition-colors active:scale-95 ${activeTab === 'cms' ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'}`}
           >
-            CRM Email & Directory
+            CMS Portal
           </button>
           
           <button
@@ -1489,8 +1800,10 @@ export default function App() {
             onClick={() => { setActiveTab('config'); setMobileMenuOpen(false); }}
             className={`p-3 rounded-lg font-bold text-sm text-left transition-colors active:scale-95 ${activeTab === 'config' ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'}`}
           >
-            Internal Memo Simulation
+            Configuration
           </button>
+          </>
+          )}
           
           <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 px-2 py-3 mt-2">
             <div>
@@ -1793,7 +2106,7 @@ export default function App() {
           )}
 
           {/* TAB 4: REPORTS TAB */}
-          {activeTab === 'reports' && (
+          {activeTab === 'reports' && (authUserRole === UserRole.FINANCE_OFFICER || authUserRole === UserRole.SYSTEM_ADMIN) && (
             <Reports
               advances={advances}
               retirements={retirements}
@@ -1802,9 +2115,9 @@ export default function App() {
             />
           )}
 
-          {/* TAB CRM: EMAIL AND STAFF CRM PORTAL */}
-          {activeTab === 'crm' && (
-            <CrmPortal
+          {/* TAB CMS: EMAIL AND STAFF CMS PORTAL */}
+          {activeTab === 'cms' && authUserRole === UserRole.SYSTEM_ADMIN && (
+            <CmsPortal
               templates={templates}
               onSaveTemplate={(updatedTpl) => {
                 const nextTemplates = templates.map(t => t.id === updatedTpl.id ? updatedTpl : t);
@@ -1839,7 +2152,7 @@ export default function App() {
           )}
 
           {/* TAB 5: AUDIT TRAIL LOG TAB */}
-          {activeTab === 'audit' && (
+          {activeTab === 'audit' && (authUserRole === UserRole.INTERNAL_CONTROL || authUserRole === UserRole.SYSTEM_ADMIN) && (
             <AuditTrail
               logs={logs}
               onClearLogs={handleClearLogs}
@@ -1847,7 +2160,7 @@ export default function App() {
           )}
 
           {/* TAB 6: SYSTEM SANDBOX CONTROLS TAB */}
-          {activeTab === 'config' && (
+          {activeTab === 'config' && authUserRole === UserRole.SYSTEM_ADMIN && (
             <div className="max-w-xl mx-auto bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6 animate-fade-in text-center">
               <ShieldAlert className="w-12 h-12 text-indigo-600 mx-auto animate-pulse" />
               <div>
@@ -1865,7 +2178,7 @@ export default function App() {
                 </p>
                 <ul className="text-[11px] list-disc pl-4 text-slate-500 space-y-1">
                   <li><strong>After 2 Days:</strong> Push alert notify to Finance Officer: <em>"Payment request {`{Ref}`} has been awaiting processing..."</em></li>
-                  <li><strong>After 5 Days:</strong> Escalate alerts directly to Head of Administration and Executive Director levels.</li>
+                  <li><strong>After 5 Days:</strong> Escalate alerts directly to Line Manager and Executive Director levels.</li>
                 </ul>
 
                 <div className="pt-2 grid grid-cols-2 gap-2 text-center">

@@ -97,10 +97,14 @@ export default function LoginPortal({ onLoginSuccess, staffList = STAFF_MEMBERS 
           <div className="space-y-4">
             <div className="h-10 flex items-center justify-start shrink-0 overflow-hidden">
               <img 
-                src="https://imgur.com/Om0LsC2.png" 
+                src="https://i.imgur.com/Om0LsC2.png" 
                 alt="Company Logo" 
                 className="h-full object-contain cursor-pointer"
-                referrerPolicy="no-referrer" 
+                referrerPolicy="no-referrer"
+                onError={(event) => {
+                  const target = event.currentTarget as HTMLImageElement;
+                  target.style.display = 'none';
+                }}
               />
             </div>
             

@@ -205,11 +205,11 @@ export default function RetirementForm({
       receiptName: receipt ? receipt.name : 'scanned_receipt_slips.pdf', // fallback mock
       receiptUrl: receiptUrl,
       comment: expenseComment,
-      currentStatus: RetirementStatus.PENDING_HEAD_OF_ADMIN, // submits to head of admin
+      currentStatus: RetirementStatus.PENDING_HEAD_OF_ADMIN, // submits to Line Manager
       approvalHistory: [
         {
           userId: '1',
-          userRole: selectedCA?.initiator === 'Ovat Daniel' ? (selectedCA?.department === 'Administration' ? 'Admin Officer' : 'Internal Control' as any) : 'Admin Officer' as any,
+          userRole: selectedCA?.initiator === 'Ovat Daniel' ? (selectedCA?.department === 'Administration' ? 'Initiator' : 'Internal Control' as any) : 'Initiator' as any,
           userName: selectedCA?.staffName || 'Ovat Daniel',
           action: 'Submit Retirement',
           date: '2026-06-12 09:30',

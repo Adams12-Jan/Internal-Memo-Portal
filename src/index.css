@@ -6,25 +6,32 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
   /* Brand-aligned High Contrast Gold and Black Palette overrides */
-  --color-blue-50: #F9F8F3;
-  --color-blue-100: #E6E1C8;
-  --color-blue-200: #D0C69E;
-  --color-blue-500: #9F9055;
-  --color-blue-600: #9F9055;
-  --color-blue-700: #9C8F59;
+  /* Vetiva palette */
+  --color-deep-forest: #13201E; /* primary deep forest green */
+  --color-dark-green: #3A4645; /* dark accents / shadows */
+  --color-gold-bronze: #977A4A; /* primary gold/bronze */
+  --color-light-gold: #A68D63; /* secondary gold */
+  --color-off-white: #EFEFF1; /* header background */
+  --color-warm-beige: #D3C8B1; /* decorative beige */
+
+  --color-blue-50: var(--color-off-white);
+  --color-blue-100: var(--color-warm-beige);
+  --color-blue-200: #CFC2A8;
+  --color-blue-500: var(--color-gold-bronze);
+  --color-blue-600: var(--color-gold-bronze);
+  --color-blue-700: var(--color-light-gold);
   --color-blue-800: #8A7C4A;
-  --color-blue-900: #000000;
-  --color-blue-950: #000000;
+  --color-blue-900: #0b0b0b;
 
-  --color-amber-50: #FAFAF4;
-  --color-amber-100: #EADFB3;
-  --color-amber-600: #9F9055;
-  --color-amber-700: #9C8F59;
+  --color-amber-50: #fffaf6;
+  --color-amber-100: #f5edda;
+  --color-amber-600: var(--color-gold-bronze);
+  --color-amber-700: var(--color-light-gold);
   --color-amber-800: #8A7C4A;
-  --color-amber-900: #0D0D0D;
+  --color-amber-900: #0f0f0f;
 
-  --color-slate-900: #000000;
-  --color-slate-950: #000000;
+  --color-slate-900: var(--color-deep-forest);
+  --color-slate-950: #07110f;
 }
 
 /* Custom global overrides to enforce high contrast */
@@ -157,6 +164,59 @@ body {
 
 .dark .bg-slate-900 {
   background-color: #0a0a0a !important;
+}
+
+/* Header and Sidebar brand-contrast overrides (Vetiva) */
+#app-primary-header {
+  color: var(--color-off-white);
+  border: 1px solid #3A4645 !important;
+}
+
+.dark #app-primary-header {
+  border-color: #3A4645 !important;
+}
+
+/* Ensure any utility classes inside header that expect white or pale text remain readable */
+#app-primary-header .text-white,
+#app-primary-header .text-slate-50,
+#app-primary-header .text-blue-100 {
+  color: var(--color-off-white) !important;
+}
+
+/* Subtle header secondary text uses light gold on the dark green background */
+#app-primary-header .text-slate-400,
+#app-primary-header .text-slate-500 {
+  color: var(--color-light-gold) !important;
+}
+
+/* Subtext in header uses dark green for lighter emphasis */
+#app-primary-header .text-slate-400,
+#app-primary-header .text-slate-500 {
+  color: var(--color-dark-green) !important;
+}
+
+/* Sidebar should use off-white text on deep-forest background */
+aside[role="navigation"], aside {
+  color: var(--color-off-white) !important;
+}
+
+aside .text-slate-300,
+aside .text-white,
+aside .text-blue-300,
+aside .text-blue-500 {
+  color: var(--color-off-white) !important;
+}
+
+/* Sidebar small accent text (labels) in gold */
+aside .text-[9px],
+aside .font-mono,
+aside .tracking-widest {
+  color: var(--color-light-gold) !important;
+}
+
+/* Buttons and actionable links on off-white backgrounds should use deep-forest text for readability */
+.bg-white a, .bg-white .text-blue-600, .bg-white .text-slate-700 {
+  color: var(--color-deep-forest) !important;
 }
 
 /* Let's style scrollbar for dark mode compatibility */

@@ -6,6 +6,8 @@ export interface ContactPayload {
   phone?: string;
   department?: string;
   role?: string;
+  first_name?: string; // Added first name support
+  last_name?: string;  // Added last name support
 }
 
 export interface DealPayload {
@@ -24,7 +26,17 @@ export interface CampaignPayload {
   status?: string;
 }
 
-class CrmClient {
+export interface MediaUploadResult {
+  id: string;
+  name: string;
+  size: number;
+  storedPath: string;
+  fileUrl: string;
+  shareUrl?: string;
+  message: string;
+}
+
+class CmsClient {
   private normalizeHeaders(headers?: HeadersInit): Record<string, string> {
     if (!headers) return {};
     if (headers instanceof Headers) {
@@ -54,11 +66,23 @@ class CrmClient {
 
   // ===== CONTACTS =====
   async getContacts(limit = 50, offset = 0) {
-    return this.fetchWithAuth(`${API_BASE}/crm/contacts?limit=${limit}&offset=${offset}`);
+    return this.fetchWithAuth(`${API_BASE}/cms/contacts?limit=${limit}&offset=${offset}`);
+  }
+
+  async searchContacts(query: string, limit = 50, offset = 0) {
+    return this.fetchWithAuth(`${API_BASE}/cms/contacts/search?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`);
+  }
+
+  async updateContact(id: string, payload: Partial<ContactPayload>) {
+    return this.fetchWithAuth(`${API_BASE}/cms/contacts/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
   }
 
   async createContact(payload: ContactPayload) {
-    return this.fetchWithAuth(`${API_BASE}/crm/contacts`, {
+    return this.fetchWithAuth(`${API_BASE}/cms/contacts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -66,16 +90,16 @@ class CrmClient {
   }
 
   async deleteContact(id: string) {
-    return this.fetchWithAuth(`${API_BASE}/crm/contacts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return this.fetchWithAuth(`${API_BASE}/cms/contacts/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
   // ===== DEALS =====
   async getDeals(limit = 50, offset = 0) {
-    return this.fetchWithAuth(`${API_BASE}/crm/deals?limit=${limit}&offset=${offset}`);
+    return this.fetchWithAuth(`${API_BASE}/cms/deals?limit=${limit}&offset=${offset}`);
   }
 
   async createDeal(payload: DealPayload) {
-    return this.fetchWithAuth(`${API_BASE}/crm/deals`, {
+    return this.fetchWithAuth(`${API_BASE}/cms/deals`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -83,7 +107,7 @@ class CrmClient {
   }
 
   async updateDeal(id: string, payload: Partial<DealPayload>) {
-    return this.fetchWithAuth(`${API_BASE}/crm/deals/${encodeURIComponent(id)}`, {
+    return this.fetchWithAuth(`${API_BASE}/cms/deals/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -91,16 +115,33 @@ class CrmClient {
   }
 
   async deleteDeal(id: string) {
-    return this.fetchWithAuth(`${API_BASE}/crm/deals/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return this.fetchWithAuth(`${API_BASE}/cms/deals/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  }
+
+  async uploadMedia(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${API_BASE}/files/upload`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || 'Media upload failed');
+    }
+
+    return response.json() as Promise<MediaUploadResult>;
   }
 
   // ===== CAMPAIGNS =====
   async getCampaigns(limit = 50, offset = 0) {
-    return this.fetchWithAuth(`${API_BASE}/crm/campaigns?limit=${limit}&offset=${offset}`);
+    return this.fetchWithAuth(`${API_BASE}/cms/campaigns?limit=${limit}&offset=${offset}`);
   }
 
   async createCampaign(payload: CampaignPayload) {
-    return this.fetchWithAuth(`${API_BASE}/crm/campaigns`, {
+    return this.fetchWithAuth(`${API_BASE}/cms/campaigns`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -108,7 +149,7 @@ class CrmClient {
   }
 
   async updateCampaign(id: string, payload: Partial<CampaignPayload>) {
-    return this.fetchWithAuth(`${API_BASE}/crm/campaigns/${encodeURIComponent(id)}`, {
+    return this.fetchWithAuth(`${API_BASE}/cms/campaigns/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -116,8 +157,8 @@ class CrmClient {
   }
 
   async deleteCampaign(id: string) {
-    return this.fetchWithAuth(`${API_BASE}/crm/campaigns/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return this.fetchWithAuth(`${API_BASE}/cms/campaigns/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 }
 
-export default new CrmClient();
+export default new CmsClient();

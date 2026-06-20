@@ -6,7 +6,7 @@ import {
   FileCheck, Eye, UploadCloud, X, Paperclip, Upload
 } from 'lucide-react';
 import { CashAdvanceRequest, RequestStatus, UserRole, PaymentMethod, STAFF_MEMBERS, PaymentDetails } from '../types';
-import { uploadFileToBackend, uploadFileToMicrosoft, requestMicrosoftSign } from '../services/microsoftApi';
+import { uploadFileToBackend } from '../services/microsoftApi';
 
 interface RequestDetailsProps {
   request: CashAdvanceRequest;
@@ -33,6 +33,7 @@ export default function RequestDetails({
   const [errorMsg, setErrorMsg] = useState('');
   const [printSuccess, setPrintSuccess] = useState(false);
   const [viewingProofReceipt, setViewingProofReceipt] = useState(false);
+  const [approverName, setApproverName] = useState(currentUserName);
 
   // Edit states for resubmission (if draft or rejected)
   const [isEditing, setIsEditing] = useState(false);
@@ -53,10 +54,7 @@ export default function RequestDetails({
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofUploadStatus, setProofUploadStatus] = useState('');
   const [proofBackendUrl, setProofBackendUrl] = useState('');
-  const [proofMicrosoftUrl, setProofMicrosoftUrl] = useState('');
-  const [proofUploadDestination, setProofUploadDestination] = useState<'local' | 'onedrive' | 'sharepoint'>('local');
   const [isUploadInProgress, setIsUploadInProgress] = useState(false);
-  const [isSigningProof, setIsSigningProof] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
   // E-Signature state manager
@@ -68,6 +66,7 @@ export default function RequestDetails({
 
   useEffect(() => {
     setTypedSignature(currentUserName);
+    setApproverName(currentUserName);
   }, [currentUserName]);
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -173,17 +172,19 @@ export default function RequestDetails({
     setErrorMsg('');
     
     // Core dynamic signature injection
-    const finalSignature = (action === 'Approve' || action === 'Send to Finance')
-      ? (signatureMode === 'typed' ? `typed:${typedSignature}` : (drawnSignature ? `drawn:${drawnSignature}` : `typed:${currentUserName}`))
-      : undefined;
+    const finalSignature = signatureMode === 'typed'
+      ? `typed:${typedSignature || approverName}`
+      : (drawnSignature ? `drawn:${drawnSignature}` : undefined);
 
     onApprovalAction(action, comment, undefined, undefined, finalSignature);
     setComment('');
     setDrawnSignature(null); // Reset after action completes successfully
   };
 
-  const handlePayAction = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePayAction = (e?: React.FormEvent | React.MouseEvent<HTMLButtonElement>) => {
+    if (e && 'preventDefault' in e) {
+      e.preventDefault();
+    }
     if (!paymentReference.trim()) {
       setErrorMsg('Payment reference is required to disburse funds');
       return;
@@ -205,7 +206,7 @@ export default function RequestDetails({
     const finalProofUrl = proofOfPaymentUrl || 'https://imgur.com/1RyshXT.png';
 
     const finalSignature = signatureMode === 'typed' 
-      ? `typed:${typedSignature}` 
+      ? `typed:${typedSignature || approverName}` 
       : (drawnSignature ? `drawn:${drawnSignature}` : `typed:${currentUserName}`);
 
     onApprovalAction('Pay', comment || 'Disbursed', {
@@ -250,7 +251,7 @@ export default function RequestDetails({
       case RequestStatus.PENDING_INTERNAL_CONTROL:
         return currentRole === UserRole.INTERNAL_CONTROL || currentRole === UserRole.SYSTEM_ADMIN;
       case RequestStatus.PENDING_EXECUTIVE_OFFICE:
-        return currentRole === UserRole.EXECUTIVE_OFFICE || currentRole === UserRole.SYSTEM_ADMIN;
+        return currentRole === UserRole.EXECUTIVE_DIRECTOR || currentRole === UserRole.SYSTEM_ADMIN;
       case RequestStatus.PENDING_HEAD_OF_ADMIN_RELEASE:
         return currentRole === UserRole.HEAD_OF_ADMIN || currentRole === UserRole.SYSTEM_ADMIN;
       case RequestStatus.AWAITING_FINANCE_PAYMENT:
@@ -308,18 +309,33 @@ export default function RequestDetails({
         {signatureMode === 'typed' ? (
           <div className="space-y-1.5">
             <p className="text-[9px] text-slate-400 leading-normal">
-              A dynamic cursive typeface will represent your official signature. You can customize the spelling:
+              Enter the approver name and signature text below to confirm the memo approval.
             </p>
-            <input
-              type="text"
-              className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500 font-sans tracking-wide font-medium"
-              value={typedSignature}
-              onChange={(e) => setTypedSignature(e.target.value)}
-              placeholder="Type signature name..."
-            />
+            <div className="grid gap-3">
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-slate-500 mb-1">Approver Name</label>
+                <input
+                  type="text"
+                  className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500 font-sans tracking-wide font-medium"
+                  value={approverName}
+                  onChange={(e) => setApproverName(e.target.value)}
+                  placeholder="Approver name"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-slate-500 mb-1">Typed Signature</label>
+                <input
+                  type="text"
+                  className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500 font-sans tracking-wide font-medium"
+                  value={typedSignature}
+                  onChange={(e) => setTypedSignature(e.target.value)}
+                  placeholder="Type signature text..."
+                />
+              </div>
+            </div>
             <div className="bg-amber-50/20 border border-amber-200/30 rounded-lg p-3 flex items-center justify-center min-h-[60px] select-none">
               <span className="font-serif italic text-2xl text-blue-700 tracking-widest font-bold">
-                {typedSignature || currentUserName}
+                {typedSignature || approverName || currentUserName}
               </span>
             </div>
           </div>
@@ -402,19 +418,19 @@ export default function RequestDetails({
   };
 
   const stepperSteps = [
-    { name: '1. Initiated', role: 'Admin Officer' },
-    { name: '2. Audited', role: 'Head of Admin' },
-    { name: '3. Compliance', role: 'Internal Control' },
-    { name: '4. Signed', role: 'Executive Office' },
-    { name: '5. Released', role: 'Head of Admin' },
-    { name: '6. Paid', role: 'Finance Officer' }
+    { name: 'Initiator submitted request', role: 'Initiator' },
+    { name: 'Line Manager approval', role: 'Line Manager' },
+    { name: 'Internal Control review', role: 'Internal Control' },
+    { name: 'Executive Manager clearance', role: 'Executive Director' },
+    { name: 'Release to Finance', role: 'Line Manager' },
+    { name: 'Awaiting Finance payment', role: 'Finance Officer' }
   ];
 
   return (
     <div id={`request-details-card-${request.id}`} className="space-y-6 animate-fade-in print:bg-white print:p-0">
       
       {/* Detail bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-200 print:hidden">
+      <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-2 sm:gap-4 pb-4 border-b border-slate-200 print:hidden">
         <button
           id="back-list-from-detail"
           onClick={onBack}
@@ -423,11 +439,11 @@ export default function RequestDetails({
           <ArrowLeft className="w-4 h-4" /> Go Back to List
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             id="print-request-btn"
             onClick={simulatePrint}
-            className="text-xs font-bold text-slate-600 hover:text-blue-700 hover:bg-blue-50 py-1 px-2.5 rounded transition-all flex items-center gap-1 border border-slate-200"
+            className="text-xs font-bold text-slate-600 hover:text-blue-700 hover:bg-blue-50 py-1 px-2.5 rounded transition-all flex items-center gap-1 border border-slate-200 flex-1 sm:flex-none justify-center"
             title="Download PDF Voucher"
           >
             <Printer className="w-4 h-4" /> Print Approval Slip
@@ -442,20 +458,20 @@ export default function RequestDetails({
       </div>
 
       {/* Main Request Form Visual Info */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-slate-200">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200">
         
         {/* Core content Column 1 & 2 */}
-        <div className="lg:col-span-2 p-6 space-y-6">
+        <div className="md:col-span-2 p-3 sm:p-6 space-y-4 sm:space-y-6">
           <div className="flex justify-between items-start gap-4">
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded font-mono">
                   {request.referenceNumber}
                 </span>
-                <span className="text-xs text-slate-400 font-mono font-medium">{request.requestDate}</span>
+                <span className="text-[10px] sm:text-xs text-slate-400 font-mono font-medium">{request.requestDate}</span>
               </div>
-              <h3 className="text-xl font-bold text-slate-800 mt-2">Cash Advance Request Form Details</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Assigned workflows run automatically in sequence</p>
+              <h3 className="text-lg sm:text-xl font-bold text-slate-800 mt-2">Cash Advance Request Form Details</h3>
+              <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">Assigned workflows run automatically in sequence</p>
             </div>
             
             <div className="text-right">
@@ -478,36 +494,35 @@ export default function RequestDetails({
           </div>
 
           {/* Stepper Component (Visual Workflow Progress Tracker) */}
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-5">Workflow Progress Stepper</h4>
+          <div className="p-3 sm:p-4 bg-slate-50 rounded-xl border border-slate-100">
+            <h4 className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-5">Workflow Progress Stepper</h4>
             {request.currentStatus === RequestStatus.REJECTED ? (
-              <div className="flex items-center gap-3 p-3 bg-rose-50 text-rose-800 rounded-lg border border-rose-200 text-xs">
-                <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0" />
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 bg-rose-50 text-rose-800 rounded-lg border border-rose-200 text-[11px] sm:text-xs">
+                <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5 sm:mt-0" />
                 <div>
                   <h5 className="font-bold">Workflow Terminated (Rejected)</h5>
                   <p className="opacity-90">Please look at comments below, correct the issue in the Initiator roles, and Click Resubmit.</p>
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-3 relative">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 relative">
                 {stepperSteps.map((step, idx) => {
                   const isCompleted = activeStep > idx;
                   const isActive = activeStep === idx;
                   return (
                     <div key={idx} className="relative flex flex-col items-center text-center">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border-2 z-10 ${
+                      <div className={`w-7 sm:w-8 h-7 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs border-2 z-10 ${
                         isCompleted 
                           ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm shadow-emerald-200' 
                           : isActive 
                             ? 'bg-blue-600 border-blue-600 text-white animate-pulse' 
                             : 'bg-white border-slate-200 text-slate-400'
                       }`}>
-                        {isCompleted ? <Check className="w-4 h-4" /> : idx + 1}
+                        {isCompleted ? <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : idx + 1}
                       </div>
-                      <p className={`text-xs font-bold mt-2 ${isActive ? 'text-blue-700' : isCompleted ? 'text-emerald-700 font-semibold' : 'text-slate-400'}`}>
+                      <p className={`text-[9px] sm:text-xs font-bold mt-1.5 ${isActive ? 'text-blue-700' : isCompleted ? 'text-emerald-700 font-semibold' : 'text-slate-400'}`}>
                         {step.name}
                       </p>
-                      <p className="text-[9px] text-slate-400 mt-0.5 uppercase tracking-wide">{step.role}</p>
                     </div>
                   );
                 })}
@@ -517,11 +532,11 @@ export default function RequestDetails({
 
           {/* Form edit fields vs static list fields */}
           {isEditing ? (
-            <form id="details-edit-form" onSubmit={handleResubmit} className="space-y-4 bg-blue-50/20 p-4 rounded-xl border border-blue-100">
-              <h4 className="text-xs font-bold text-blue-800 uppercase tracking-widest">Resubmit Form Fields</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form id="details-edit-form" onSubmit={handleResubmit} className="space-y-3 sm:space-y-4 bg-blue-50/20 p-3 sm:p-4 rounded-xl border border-blue-100">
+              <h4 className="text-[10px] sm:text-xs font-bold text-blue-800 uppercase tracking-widest">Resubmit Form Fields</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase">Staff Name</label>
+                  <label className="block text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase">Staff Name</label>
                   <input
                     id="edit-staff-name"
                     type="text"
@@ -532,7 +547,7 @@ export default function RequestDetails({
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase">Department</label>
+                  <label className="block text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase">Department</label>
                   <input
                     id="edit-dept-name"
                     type="text"
@@ -718,37 +733,45 @@ export default function RequestDetails({
               {request.approvalHistory.length === 0 ? (
                 <p className="text-xs text-slate-400 italic">No workflow actions registered.</p>
               ) : (
-                request.approvalHistory.map((item, index) => (
-                  <div key={index} className="relative pl-5 border-l border-slate-200 last:border-0 pb-1">
-                    <div className="absolute left-0 top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-slate-300"></div>
-                    <div className="text-xs">
-                      <div className="flex justify-between font-semibold text-slate-800 flex-wrap gap-x-2">
-                        <span>{item.action} by {item.userName}</span>
-                      </div>
-                      <span className="text-[10px] text-slate-400 font-mono block mt-0.5">{item.date} • {item.userRole}</span>
-                      {item.comment && (
-                        <p className="mt-1 p-1.5 bg-white text-slate-600 rounded border border-slate-100 text-[11px] leading-relaxed break-words">
-                          {item.comment}
-                        </p>
-                      )}
-                      {item.signatureSvg && (
-                        <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-slate-500 select-none">
-                          <span className="font-mono text-[8px] uppercase tracking-wider text-slate-400">Auth Signature:</span>
-                          {item.signatureSvg.startsWith('drawn:') ? (
-                            <img src={item.signatureSvg.substring(6)} className="h-7 max-h-9 max-w-[140px] object-contain border-b border-dashed border-blue-300 bg-blue-50/20 px-1.5 py-0.5 rounded" alt="Signature" referrerPolicy="no-referrer" />
-                          ) : (
-                            <span className="font-serif italic text-xs text-blue-600 border-b border-dashed border-blue-300 font-bold px-2 py-0.5 bg-blue-50/20 rounded tracking-widest">
-                              {item.signatureSvg.substring(6)}
-                            </span>
-                          )}
-                          <span className="text-[8px] text-emerald-700 font-extrabold bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-900/35 flex items-center gap-0.5 shrink-0">
-                            🔒 SECURED DIGITAL V-STAMP
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-12 gap-2 px-3 py-2 text-[10px] uppercase tracking-wider font-bold text-slate-500 bg-slate-100 rounded-lg">
+                    <span className="col-span-4">Approver</span>
+                    <span className="col-span-4">Signature</span>
+                    <span className="col-span-4">Date / Time</span>
                   </div>
-                ))
+                  <div className="space-y-2">
+                    {request.approvalHistory.map((item, index) => (
+                      <div key={index} className="grid grid-cols-12 gap-2 p-3 bg-white border border-slate-200 rounded-xl">
+                        <div className="col-span-4">
+                          <div className="font-semibold text-slate-800">{item.userName}</div>
+                          <div className="text-[10px] text-slate-400">{item.userRole}</div>
+                          <div className="mt-1 text-[10px] text-slate-500">{item.action}</div>
+                        </div>
+                        <div className="col-span-4">
+                          {item.signatureSvg ? (
+                            item.signatureSvg.startsWith('drawn:') ? (
+                              <img src={item.signatureSvg.substring(6)} className="h-10 max-h-12 max-w-full object-contain border-b border-dashed border-blue-300 bg-blue-50/20 px-1 py-0.5 rounded" alt="Signature" referrerPolicy="no-referrer" />
+                            ) : (
+                              <span className="font-serif italic text-xs text-blue-600 border-b border-dashed border-blue-300 font-bold px-2 py-1 bg-blue-50/20 rounded tracking-wider block">
+                                {item.signatureSvg.substring(6)}
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic">No signature recorded</span>
+                          )}
+                        </div>
+                        <div className="col-span-4">
+                          <div className="font-semibold text-slate-800">{item.date}</div>
+                          {item.comment && (
+                            <p className="mt-1 text-[11px] text-slate-600 bg-slate-50 p-2 rounded border border-slate-100 leading-relaxed">
+                              {item.comment}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -846,7 +869,7 @@ export default function RequestDetails({
                 </div>
               )}
 
-              {/* State B: Normal Approver Role (Head of Admin, Internal Control, Executive Office) */}
+              {/* State B: Normal Approver Role (Line Manager, Internal Control, Executive Director) */}
               {[
                 RequestStatus.SUBMITTED, 
                 RequestStatus.PENDING_HEAD_OF_ADMIN, 
@@ -895,11 +918,11 @@ export default function RequestDetails({
 
                   {renderESignaturePad()}
 
-                  <div className="grid grid-cols-1 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                     <button
                       id="approve-action-btn"
                       onClick={() => handleAction('Approve')}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded text-xs transition-all shadow-sm flex items-center justify-center gap-1"
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 sm:py-2.5 rounded text-xs transition-all shadow-sm flex items-center justify-center gap-1"
                     >
                       <CheckCircle className="w-4 h-4" /> Approve & Forward
                     </button>
@@ -923,7 +946,7 @@ export default function RequestDetails({
                 </div>
               )}
 
-              {/* State C: Head of Admin Final release action */}
+              {/* State C: Line Manager Final release action */}
               {request.currentStatus === RequestStatus.PENDING_HEAD_OF_ADMIN_RELEASE && isAuthorizedToApprove() && (
                 <div className="space-y-4">
                   <p className="text-xs text-slate-600 leading-normal">
@@ -958,7 +981,7 @@ export default function RequestDetails({
                   <textarea
                     id="panel-comment-input-hoar"
                     rows={2}
-                    placeholder="Head of Admin Comments..."
+                    placeholder="Line Manager Comments..."
                     className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-xs outline-none"
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
@@ -1006,31 +1029,29 @@ export default function RequestDetails({
                       />
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] uppercase font-bold text-slate-500">Method</label>
-                        <select
-                          id="fin-method"
-                          className="w-full bg-slate-50 border border-slate-200 p-2 rounded text-xs"
-                          value={paymentMethod}
-                          onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                        >
-                          <option value="Bank Transfer">Bank Transfer</option>
-                          <option value="Cash">Cash Voucher</option>
-                          <option value="Cheque">Cheque Draft</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] uppercase font-bold text-slate-500">Amount Paid</label>
-                        <input
-                          id="fin-amount"
-                          type="number"
-                          className="w-full bg-slate-50 border border-slate-200 p-1.5 rounded outline-none font-bold text-slate-700 text-xs"
-                          value={amountPaid}
-                          onChange={(e) => setAmountPaid(e.target.value)}
-                          required
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-slate-500">Method</label>
+                      <select
+                        id="fin-method"
+                        className="w-full bg-slate-50 border border-slate-200 p-2 rounded text-xs"
+                        value={paymentMethod}
+                        onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                      >
+                        <option value="Bank Transfer">Bank Transfer</option>
+                        <option value="Cash">Cash Voucher</option>
+                        <option value="Cheque">Cheque Draft</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-slate-500">Amount Paid</label>
+                      <input
+                        id="fin-amount"
+                        type="number"
+                        className="w-full bg-slate-50 border border-slate-200 p-1.5 rounded outline-none font-bold text-slate-700 text-xs"
+                        value={amountPaid}
+                        onChange={(e) => setAmountPaid(e.target.value)}
+                        required
+                      />
                     </div>
 
                     <div>
@@ -1089,7 +1110,6 @@ export default function RequestDetails({
                               setProofOfPaymentUrl('');
                               setProofUploadStatus('Ready to upload to portal');
                               setProofBackendUrl('');
-                              setProofMicrosoftUrl('');
                             }
                           }}
                           accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
@@ -1121,7 +1141,6 @@ export default function RequestDetails({
                                   setProofFile(null);
                                   setProofUploadStatus('');
                                   setProofBackendUrl('');
-                                  setProofMicrosoftUrl('');
                                 }}
                                 className="p-1 text-slate-400 hover:text-rose-500 rounded cursor-pointer"
                               >
@@ -1153,65 +1172,9 @@ export default function RequestDetails({
                                 Upload to Portal
                               </button>
 
-                              <div className="flex items-center gap-2">
-                                <select
-                                  value={proofUploadDestination}
-                                  onChange={(e) => setProofUploadDestination(e.target.value as 'local' | 'onedrive' | 'sharepoint')}
-                                  className="w-full text-xs border border-slate-200 rounded-lg p-2 bg-white"
-                                >
-                                  <option value="onedrive">OneDrive</option>
-                                  <option value="sharepoint">SharePoint</option>
-                                </select>
+                              <div className="text-[10px] text-slate-500 leading-normal p-2 rounded border border-slate-200 bg-slate-50">
+                                Portal-only upload enabled. SharePoint/OneDrive options have been removed from finance receipt handling.
                               </div>
-                            </div>
-
-                            <div className="grid gap-2 sm:grid-cols-2">
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  if (!proofFile) return;
-                                  setIsUploadInProgress(true);
-                                  setProofUploadStatus(`Uploading to ${proofUploadDestination}...`);
-                                  try {
-                                    const result = await uploadFileToMicrosoft(proofFile, proofUploadDestination === 'sharepoint' ? 'sharepoint' : 'onedrive');
-                                    setProofMicrosoftUrl(result.shareUrl || '');
-                                    setProofUploadStatus(result.message);
-                                    if (result.shareUrl) {
-                                      setProofOfPaymentUrl(result.shareUrl);
-                                    }
-                                  } catch (error) {
-                                    setProofUploadStatus(`Microsoft upload failed: ${error instanceof Error ? error.message : String(error)}`);
-                                  } finally {
-                                    setIsUploadInProgress(false);
-                                  }
-                                }}
-                                className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white py-2 rounded transition-all"
-                                disabled={!proofFile || isUploadInProgress}
-                              >
-                                Upload to {proofUploadDestination === 'sharepoint' ? 'SharePoint' : 'OneDrive'}
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  if (!proofFile) return;
-                                  setIsSigningProof(true);
-                                  setProofUploadStatus('Requesting document signing...');
-                                  try {
-                                    const result = await requestMicrosoftSign(proofFile, currentUserName);
-                                    setProofOfPaymentUrl(result.signedUrl);
-                                    setProofUploadStatus(result.message);
-                                  } catch (error) {
-                                    setProofUploadStatus(`Signing request failed: ${error instanceof Error ? error.message : String(error)}`);
-                                  } finally {
-                                    setIsSigningProof(false);
-                                  }
-                                }}
-                                className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded transition-all"
-                                disabled={!proofFile || isSigningProof}
-                              >
-                                Request Signed Copy
-                              </button>
                             </div>
 
                             {proofUploadStatus && (
@@ -1221,11 +1184,6 @@ export default function RequestDetails({
                             {proofBackendUrl && (
                               <a href={proofBackendUrl} target="_blank" rel="noreferrer" className="text-[11px] text-blue-600 underline block truncate">
                                 View portal copy
-                              </a>
-                            )}
-                            {proofMicrosoftUrl && (
-                              <a href={proofMicrosoftUrl} target="_blank" rel="noreferrer" className="text-[11px] text-blue-600 underline block truncate">
-                                View Microsoft copy
                               </a>
                             )}
                           </div>
@@ -1255,6 +1213,9 @@ export default function RequestDetails({
                     <div>
                       <label className="block text-[10px] uppercase font-bold text-slate-400">Finance Auditor Comment</label>
                       {/* Dynamic Organization Tagging via Email */}
+                      <div className="mt-2 mb-3 text-[10px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                        This action will send the payment receipt email to the request owner and also notify any @tagged people in the comment.
+                      </div>
                       <div className="mt-1.5 mb-1 flex flex-wrap items-center gap-1 text-[10px] text-slate-500 font-sans">
                         <span className="font-bold flex items-center gap-0.5 text-blue-600 select-none">
                           Tag member via email:
@@ -1292,11 +1253,12 @@ export default function RequestDetails({
 
                   {renderESignaturePad()}
 
-                  <div className="grid grid-cols-1 gap-2 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
                     <button
                       id="mark-paid-action-btn"
-                      type="submit"
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded text-xs transition-all shadow-sm flex items-center justify-center gap-1"
+                      type="button"
+                      onClick={handlePayAction}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 sm:py-2.5 rounded text-xs transition-all shadow-sm flex items-center justify-center gap-1"
                     >
                       <CheckCircle className="w-4 h-4" /> [Mark As Paid]
                     </button>
@@ -1306,14 +1268,14 @@ export default function RequestDetails({
                       type="button"
                       onClick={() => {
                         if (!comment.trim()) {
-                          setErrorMsg('Comment is required to return to Head of Admin');
+                          setErrorMsg('Comment is required to return to Line Manager');
                           return;
                         }
                         setErrorMsg('');
                         onApprovalAction('Return to Admin', comment);
                         setComment('');
                       }}
-                      className="w-full bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold py-2 rounded text-xs transition-colors border border-amber-100 flex items-center justify-center gap-1"
+                      className="w-full bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold py-2 sm:py-2.5 rounded text-xs transition-colors border border-amber-100 flex items-center justify-center gap-1"
                     >
                       <RotateCcw className="w-3.5 h-3.5" /> [Return To Admin]
                     </button>

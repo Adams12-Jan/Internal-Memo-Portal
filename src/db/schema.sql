@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS email_verification_tokens (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- CRM Contacts/Clients
+-- CMS Contacts/Clients
 CREATE TABLE IF NOT EXISTS contacts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_by UUID NOT NULL REFERENCES users(id),
@@ -49,6 +49,8 @@ CREATE TABLE IF NOT EXISTS contacts (
   phone VARCHAR(20),
   company VARCHAR(200),
   job_title VARCHAR(100),
+  department VARCHAR(100),
+  role VARCHAR(100),
   address TEXT,
   city VARCHAR(100),
   state VARCHAR(100),
@@ -60,7 +62,10 @@ CREATE TABLE IF NOT EXISTS contacts (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- CRM Deals/Opportunities
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS department VARCHAR(100);
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS role VARCHAR(100);
+
+-- CMS Deals/Opportunities
 CREATE TABLE IF NOT EXISTS deals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_by UUID NOT NULL REFERENCES users(id),

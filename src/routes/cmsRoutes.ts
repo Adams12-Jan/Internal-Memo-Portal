@@ -18,19 +18,19 @@ import {
   updateCampaign,
   deleteCampaign,
   logAuditEvent
-} from '../services/crmService';
+} from '../services/cmsService';
 import { authenticateToken } from './authRoutes';
 
 const router = express.Router();
 
-// Apply authentication to all CRM routes
+// Apply authentication to all CMS routes
 router.use(authenticateToken);
 
 const getUserId = (req: Request) => (req as any).userId;
 
 // ============ CONTACTS ============
 
-router.post('/crm/contacts', async (req: Request, res: Response) => {
+router.post('/cms/contacts', async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
     const contact = await createContact(userId, req.body);
@@ -52,7 +52,7 @@ router.post('/crm/contacts', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/crm/contacts', async (req: Request, res: Response) => {
+router.get('/cms/contacts', async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
     const limit = parseInt(req.query.limit as string) || 50;
@@ -65,7 +65,7 @@ router.get('/crm/contacts', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/crm/contacts/search', async (req: Request, res: Response) => {
+router.get('/cms/contacts/search', async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
     const q = req.query.q as string;
@@ -81,7 +81,7 @@ router.get('/crm/contacts/search', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/crm/contacts/:id', async (req: Request, res: Response) => {
+router.get('/cms/contacts/:id', async (req: Request, res: Response) => {
   try {
     const contact = await getContact(req.params.id);
 
@@ -99,7 +99,7 @@ router.get('/crm/contacts/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/crm/contacts/:id', async (req: Request, res: Response) => {
+router.put('/cms/contacts/:id', async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
     const contact = await getContact(req.params.id);
@@ -131,7 +131,7 @@ router.put('/crm/contacts/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/crm/contacts/:id', async (req: Request, res: Response) => {
+router.delete('/cms/contacts/:id', async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
     const contact = await getContact(req.params.id);
@@ -165,7 +165,7 @@ router.delete('/crm/contacts/:id', async (req: Request, res: Response) => {
 
 // ============ DEALS ============
 
-router.post('/crm/deals', async (req: Request, res: Response) => {
+router.post('/cms/deals', async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
     const deal = await createDeal(userId, req.body);
@@ -187,7 +187,7 @@ router.post('/crm/deals', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/crm/deals', async (req: Request, res: Response) => {
+router.get('/cms/deals', async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
     const limit = parseInt(req.query.limit as string) || 50;
@@ -200,7 +200,7 @@ router.get('/crm/deals', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/crm/deals/:id', async (req: Request, res: Response) => {
+router.get('/cms/deals/:id', async (req: Request, res: Response) => {
   try {
     const deal = await getDeal(req.params.id);
 
@@ -218,7 +218,7 @@ router.get('/crm/deals/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/crm/contacts/:contactId/deals', async (req: Request, res: Response) => {
+router.get('/cms/contacts/:contactId/deals', async (req: Request, res: Response) => {
   try {
     const deals = await getDealsByContact(req.params.contactId);
     res.json(deals);
@@ -227,7 +227,7 @@ router.get('/crm/contacts/:contactId/deals', async (req: Request, res: Response)
   }
 });
 
-router.put('/crm/deals/:id', async (req: Request, res: Response) => {
+router.put('/cms/deals/:id', async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
     const deal = await getDeal(req.params.id);
@@ -259,7 +259,7 @@ router.put('/crm/deals/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/crm/deals/:id', async (req: Request, res: Response) => {
+router.delete('/cms/deals/:id', async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
     const deal = await getDeal(req.params.id);
@@ -293,7 +293,7 @@ router.delete('/crm/deals/:id', async (req: Request, res: Response) => {
 
 // ============ EMAIL CAMPAIGNS ============
 
-router.post('/crm/campaigns', async (req: Request, res: Response) => {
+router.post('/cms/campaigns', async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
     const campaign = await createEmailCampaign(userId, req.body);
@@ -315,7 +315,7 @@ router.post('/crm/campaigns', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/crm/campaigns', async (req: Request, res: Response) => {
+router.get('/cms/campaigns', async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
     const limit = parseInt(req.query.limit as string) || 50;
@@ -328,7 +328,7 @@ router.get('/crm/campaigns', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/crm/campaigns/:id', async (req: Request, res: Response) => {
+router.get('/cms/campaigns/:id', async (req: Request, res: Response) => {
   try {
     const campaign = await getCampaign(req.params.id);
 
@@ -346,7 +346,7 @@ router.get('/crm/campaigns/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/crm/campaigns/:id', async (req: Request, res: Response) => {
+router.put('/cms/campaigns/:id', async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
     const campaign = await getCampaign(req.params.id);
@@ -378,7 +378,7 @@ router.put('/crm/campaigns/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/crm/campaigns/:id', async (req: Request, res: Response) => {
+router.delete('/cms/campaigns/:id', async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
     const campaign = await getCampaign(req.params.id);

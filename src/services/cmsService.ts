@@ -9,6 +9,8 @@ export interface Contact {
   phone?: string;
   company?: string;
   job_title?: string;
+  department?: string;
+  role?: string;
   address?: string;
   city?: string;
   state?: string;
@@ -61,19 +63,26 @@ export async function createContact(
   userId: string,
   contact: Partial<Contact>
 ): Promise<Contact> {
+  const fullName = (contact.first_name || contact.last_name || (contact as any).name || '').trim();
+  const nameParts = fullName.split(' ').filter(Boolean);
+  const firstName = nameParts.shift() || 'Unknown';
+  const lastName = nameParts.join(' ') || 'Staff';
+
   const result = await query(
-    `INSERT INTO contacts (created_by, first_name, last_name, email, phone, company, job_title, 
+    `INSERT INTO contacts (created_by, first_name, last_name, email, phone, company, job_title, department, role,
      address, city, state, zip_code, country, notes, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'active')
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'active')
      RETURNING *`,
     [
       userId,
-      contact.first_name,
-      contact.last_name,
+      firstName,
+      lastName,
       contact.email,
       contact.phone,
       contact.company,
       contact.job_title,
+      contact.department,
+      contact.role,
       contact.address,
       contact.city,
       contact.state,
@@ -105,6 +114,7 @@ export async function updateContact(id: string, updates: Partial<Contact>): Prom
   let paramCount = 1;
 
   const fields = ['first_name', 'last_name', 'email', 'phone', 'company', 'job_title',
+    'department', 'role',
     'address', 'city', 'state', 'zip_code', 'country', 'notes', 'status'];
 
   for (const field of fields) {
