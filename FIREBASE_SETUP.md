@@ -149,6 +149,46 @@ reports/{docId}
 - Set your env values carefully and restart Vite after editing `.env.local`.
 - If you want to use Firebase emulators, set `VITE_USE_FIREBASE_EMULATOR=true` and run the emulator suite.
 
+## Production Deployment Checklist
+
+Follow these steps before you deploy the app to production. These ensure real Firebase is used (not the local mock) and environment variables are configured correctly on your host.
+
+1. Create a production Firebase project (or use the existing one) and register a Web App. Copy the config values.
+2. Create a `.env.production` (locally) or set the following environment variables in your hosting provider (Vercel/Netlify/Render/Railway):
+
+```
+VITE_FIREBASE_API_KEY=<your_api_key>
+VITE_FIREBASE_AUTH_DOMAIN=<your_project>.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=<your_project_id>
+VITE_FIREBASE_STORAGE_BUCKET=<your_project>.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=<sender_id>
+VITE_FIREBASE_APP_ID=<app_id>
+VITE_FIREBASE_MEASUREMENT_ID=<measurement_id>
+VITE_USE_FIREBASE_EMULATOR=false
+VITE_USE_FIREBASE_MOCK=false
+NODE_ENV=production
+```
+
+3. DO NOT commit `.env.production` or `.env.local` to Git. Use the hosting platform's dashboard to add the env vars.
+
+4. Build the frontend for production and deploy the generated static assets (Vercel/Netlify will build from your repo):
+
+```bash
+npm install
+npm run build
+```
+
+5. Deploy the backend (`server.ts`) separately if you use a backend service. Ensure the same Firebase service-account (if needed) or backend auth config is available as environment variables on the backend host.
+
+6. Verify after deploy:
+- Admin API calls include an `Authorization: Bearer <token>` header. The app stores the Firebase ID token in `localStorage['auth_token']` upon login; confirm backend receives it.
+- CMS settings (icon/button colors) persist and the logout/admin buttons reflect the configured `--cms-button-bg` and `--cms-button-text` variables.
+- HTTPS is enabled and CORS is configured on your backend to accept requests from your frontend origin.
+
+7. Rollback plan: Keep the previous deploy ready for rollback. If you enabled `VITE_USE_FIREBASE_MOCK` accidentally in production, set it to `false` and redeploy immediately.
+
+If you'd like, I can prepare a short `FIREBASE_SETUP.md` section specifically for configuring Vercel/Netlify/Render with screenshots/examples — tell me which host you'd prefer.
+
 ## Troubleshooting
 
 - **Invalid API key**: Confirm `VITE_FIREBASE_API_KEY` is correct.
