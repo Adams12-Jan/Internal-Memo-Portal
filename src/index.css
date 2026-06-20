@@ -208,7 +208,8 @@ aside .text-blue-500 {
 }
 
 /* Sidebar small accent text (labels) in gold */
-aside .text-[9px],
+/* Escaped bracketed class to satisfy plain CSS parsers */
+aside .text-\[9px\],
 aside .font-mono,
 aside .tracking-widest {
   color: var(--color-light-gold) !important;

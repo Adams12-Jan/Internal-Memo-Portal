@@ -185,6 +185,8 @@ export interface SystemCustomSettings {
   customFrameColor?: string;
   customTableColor?: string;
   customIconColor?: string;
+  customButtonBg?: string;
+  customButtonText?: string;
   themeAccent: 'default' | 'blue' | 'purple' | 'emerald' | 'crimson' | 'orange' | 'vetiva';
   borderStyle: 'default' | 'rounded' | 'sharp';
   supportEmail: string;

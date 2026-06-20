@@ -117,6 +117,8 @@ export default function CmsPortal({
   const [cmsFrameColor, setCmsFrameColor] = useState(systemSettings.customFrameColor || '#ffffff');
   const [cmsTableColor, setCmsTableColor] = useState(systemSettings.customTableColor || '#cbd5e1');
   const [cmsIconColor, setCmsIconColor] = useState(systemSettings.customIconColor || '#6366f1');
+  const [cmsButtonBg, setCmsButtonBg] = useState(systemSettings.customButtonBg || '#977A4A');
+  const [cmsButtonText, setCmsButtonText] = useState(systemSettings.customButtonText || '#ffffff');
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
   const [logoUploadStatus, setLogoUploadStatus] = useState('');
@@ -140,6 +142,8 @@ export default function CmsPortal({
     setCmsFrameColor(systemSettings.customFrameColor || '#ffffff');
     setCmsTableColor(systemSettings.customTableColor || '#cbd5e1');
     setCmsIconColor(systemSettings.customIconColor || '#6366f1');
+    setCmsButtonBg(systemSettings.customButtonBg || '#977A4A');
+    setCmsButtonText(systemSettings.customButtonText || '#ffffff');
   }, [systemSettings]);
 
   // Trigger preview compile when template selection changes
@@ -1629,6 +1633,8 @@ export default function CmsPortal({
                   customBackgroundUrl: cmsBackgroundUrl,
                     customFrameColor: cmsFrameColor,
                     customTableColor: cmsTableColor,
+                    customButtonBg: cmsButtonBg,
+                    customButtonText: cmsButtonText,
                   themeAccent: cmsAccent,
                   borderStyle: cmsBorder,
                   supportEmail: cmsSupportEmail,
@@ -1865,12 +1871,24 @@ export default function CmsPortal({
 
               <div className="space-y-1.5 pt-4">
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block font-mono">Icon & Button Color</label>
-                <input
-                  type="color"
-                  value={cmsIconColor}
-                  onChange={(e) => setCmsIconColor(e.target.value)}
-                  className="w-full h-12 p-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 outline-none transition-all"
-                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="color"
+                    value={cmsIconColor}
+                    onChange={(e) => setCmsIconColor(e.target.value)}
+                    className="w-full h-12 p-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 outline-none transition-all"
+                  />
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-[10px] text-slate-500 block">Button Background</label>
+                      <input type="color" value={cmsButtonBg} onChange={(e) => setCmsButtonBg(e.target.value)} className="w-full h-10 p-1 bg-white border border-slate-200 rounded-lg" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 block">Button Text</label>
+                      <input type="color" value={cmsButtonText} onChange={(e) => setCmsButtonText(e.target.value)} className="w-full h-10 p-1 bg-white border border-slate-200 rounded-lg" />
+                    </div>
+                  </div>
+                </div>
                 <p className="text-[9px] text-slate-400 font-medium">Choose color for UI icons, buttons, and interactive elements throughout the portal.</p>
               </div>
 

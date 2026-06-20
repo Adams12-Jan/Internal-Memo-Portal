@@ -88,6 +88,8 @@ export default function App() {
     customFrameColor: '#ffffff',
     customTableColor: '#cbd5e1',
     customIconColor: '#6366f1',
+    customButtonBg: '#977A4A',
+    customButtonText: '#ffffff',
     themeAccent: 'vetiva',
     borderStyle: 'default',
     supportEmail: 'it.support@vetiva.com',
@@ -134,7 +136,9 @@ export default function App() {
       customBackgroundUrl: nextSettings.customBackgroundUrl?.trim() || ''
       , customFrameColor: nextSettings.customFrameColor?.trim() || '#ffffff',
       customTableColor: nextSettings.customTableColor?.trim() || '#cbd5e1',
-      customIconColor: nextSettings.customIconColor?.trim() || '#6366f1'
+      customIconColor: nextSettings.customIconColor?.trim() || '#6366f1',
+      customButtonBg: nextSettings.customButtonBg?.trim() || '#977A4A',
+      customButtonText: nextSettings.customButtonText?.trim() || '#ffffff'
     };
 
     setSystemSettings(trimmedSettings);
@@ -227,6 +231,8 @@ export default function App() {
         --cms-frame-border: ${systemSettings.customFrameColor || '#cbd5e1'};
         --cms-table-border: ${systemSettings.customTableColor || '#cbd5e1'};
         --cms-icon-color: ${systemSettings.customIconColor || '#6366f1'};
+        --cms-button-bg: ${systemSettings.customButtonBg || '#977A4A'};
+        --cms-button-text: ${systemSettings.customButtonText || '#ffffff'};
       }
       .portal-dashboard .border-slate-200,
       .portal-dashboard .border-slate-150,
@@ -241,8 +247,19 @@ export default function App() {
       .portal-dashboard .divide-slate-150 > * {
         border-color: var(--cms-table-border) !important;
       }
-      #app-header-logout-trigger {
+      /* Make logout icon color rule specific to override header utility selectors */
+      #app-header-logout-trigger,
+      #app-primary-header #app-header-logout-trigger {
         color: var(--cms-icon-color) !important;
+      }
+      /* Button background and text color for highlighted header actions */
+      #app-primary-header #app-header-logout-trigger {
+        background: var(--cms-button-bg) !important;
+        color: var(--cms-button-text) !important;
+        border-color: transparent !important;
+      }
+      #app-primary-header #app-header-logout-trigger:hover {
+        filter: brightness(0.95) !important;
       }
     `;
   }, [systemSettings, currentUser]);
