@@ -4,12 +4,16 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "start": "tsx server.ts",
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
     "server": "tsx server.ts",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "render:sync-env": "node ./scripts/render-sync-env.js",
+    "vercel:sync-env": "pwsh ./scripts/vercel-set-env.ps1",
+    "vercel:list-env": "pwsh ./scripts/vercel-list-env.ps1"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -29,7 +33,7 @@
     "pg": "^8.21.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "vite": "^6.2.3"
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",

@@ -26,7 +26,7 @@ This project has been migrated to Firebase for authentication and Firestore for 
 
 ## Step 3: Configure `.env.local`
 
-Create a `.env.local` file in the project root with the following values:
+Create a `.env.local` file in the project root with the following values for local development:
 
 ```env
 VITE_FIREBASE_API_KEY=your_api_key_here
@@ -36,9 +36,13 @@ VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
 VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
 VITE_FIREBASE_MEASUREMENT_ID=your_measurement_id
+VITE_USE_FIREBASE_EMULATOR=false
+VITE_USE_FIREBASE_MOCK=false
 ```
 
 > Important: Restart the Vite server after saving `.env.local`.
+>
+> Note: `.env.local` is for local development only. For Vercel deployment, set these same `VITE_*` variables in the Vercel dashboard's Environment Variables section.
 
 ## Step 4: Enable Firebase Authentication
 
@@ -168,6 +172,8 @@ VITE_USE_FIREBASE_EMULATOR=false
 VITE_USE_FIREBASE_MOCK=false
 NODE_ENV=production
 ```
+
+> Vercel deployment: Add these as environment variables in your Vercel project settings. Do not commit `.env.production` or `.env.local` to Git. Vercel will inject `VITE_*` variables at build time.
 
 3. DO NOT commit `.env.production` or `.env.local` to Git. Use the hosting platform's dashboard to add the env vars.
 
