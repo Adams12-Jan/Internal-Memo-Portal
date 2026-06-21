@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: internal-memo-api
+    env: node
+    plan: free
+    region: oregon
+    buildCommand: "npm install"
+    startCommand: "npm run start"
+    branch: main
+    rootDir: ./
+    healthCheckPath: /api/status
