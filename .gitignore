@@ -7,4 +7,5 @@ uploads/
 *.log
 .env*
 !.env.example
+!.env.production.example
 .vercel

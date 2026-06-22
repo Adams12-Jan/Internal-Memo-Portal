@@ -30,8 +30,8 @@ View your app in AI Studio: https://ai.studio/apps/3dfb587d-828d-4676-978d-133f0
    - `VITE_FIREBASE_MEASUREMENT_ID`
    - `VITE_USE_FIREBASE_EMULATOR=false`
    - `VITE_USE_FIREBASE_MOCK=false`
+   - `VITE_API_URL=https://<your-backend-host>/`
    - `NODE_ENV=production`
-   - `VITE_API_URL=https://<your-render-service>.onrender.com`
 
 3. To sync Vercel env vars from a local env file, use the helper script:
    ```powershell

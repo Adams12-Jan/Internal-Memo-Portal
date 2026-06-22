@@ -168,6 +168,7 @@ VITE_FIREBASE_STORAGE_BUCKET=<your_project>.appspot.com
 VITE_FIREBASE_MESSAGING_SENDER_ID=<sender_id>
 VITE_FIREBASE_APP_ID=<app_id>
 VITE_FIREBASE_MEASUREMENT_ID=<measurement_id>
+VITE_API_URL=https://<your-backend-host>/
 VITE_USE_FIREBASE_EMULATOR=false
 VITE_USE_FIREBASE_MOCK=false
 NODE_ENV=production
