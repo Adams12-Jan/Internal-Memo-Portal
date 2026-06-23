@@ -1,3 +1,9 @@
+console.log("ENV CHECK:", {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID
+});
+console.log("Build timestamp:", new Date().toISOString());
+
 import { initializeApp } from 'firebase/app';
 import { getAuth, Auth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
@@ -73,3 +79,6 @@ if (isConfigured) {
 
 export { auth, firestore, storage, isConfigured };
 export default app;
+
+console.log("Firebase API Key:", import.meta.env.VITE_FIREBASE_API_KEY);
+console.log("FULL FIREBASE CONFIG:", firebaseConfig);

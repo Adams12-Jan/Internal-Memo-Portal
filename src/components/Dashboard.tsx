@@ -35,6 +35,24 @@ export default function Dashboard({
 
   const currentDateStr = currentDate.toISOString().replace('T', ' ').slice(0, 19);
 
+  // Highlight color state for the role label (allows toggling highlight color)
+  const [highlightColor, setHighlightColor] = useState<'white' | 'amber' | 'cyan'>('white');
+
+  const getHighlightClasses = () => {
+    switch (highlightColor) {
+      case 'amber':
+        return 'font-semibold text-amber-100 underline decoration-amber-200/40 decoration-2';
+      case 'cyan':
+        return 'font-semibold text-cyan-100 underline decoration-cyan-200/40 decoration-2';
+      default:
+        return 'font-semibold text-white underline decoration-white/40 decoration-2';
+    }
+  };
+
+  const cycleHighlightColor = () => {
+    setHighlightColor(prev => (prev === 'white' ? 'amber' : prev === 'amber' ? 'cyan' : 'white'));
+  };
+
   // Helper lists & status groups
   const totalCount = advances.length;
   
@@ -210,7 +228,8 @@ export default function Dashboard({
           </div>
           <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight mt-1">Internal Memo & Cash Advance Management</h2>
           <p className="text-xs sm:text-sm text-white/90 mt-1.5 font-sans max-w-2xl">
-            Welcome back! You are logged in as <span className="font-semibold text-white underline decoration-white/40 decoration-2">{currentRole}</span>. Track cash advance requests, verify retirement records, and approve vouchers.
+            Welcome back! You are logged in as <span className={getHighlightClasses()}>{currentRole}</span>. Track cash advance requests, verify retirement records, and approve vouchers.
+            <button type="button" onClick={cycleHighlightColor} className="ml-3 text-xs sm:text-sm font-medium text-white/80 underline decoration-white/30 hover:text-white transition">Change highlight color</button>
           </p>
         </div>
         <div className="bg-[#A68D63]/12 backdrop-blur-md rounded-xl py-2 px-3 sm:px-4 border border-[#A68D63] shrink-0 self-start sm:self-auto">
