@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Lock, AlertCircle, Loader, Eye, EyeOff, Chrome, Building2, ArrowRight } from 'lucide-react';
+import { Mail, Lock, AlertCircle, Loader, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import firebaseAuthService, { AuthUser } from '../services/firebaseAuthService';
-import { IDENTITIES } from '../types';
 
 interface ModernAuthProps {
   onLoginSuccess: (user: AuthUser) => void;
@@ -77,17 +76,8 @@ export default function ModernAuth({
   }, [customLogoUrlProp]);
 
   // Login form
-  const [loginIdentity, setLoginIdentity] = useState(IDENTITIES[0]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
-  // Register form
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [identity, setIdentity] = useState(IDENTITIES[0]);
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [profilePicture, setProfilePicture] = useState<File | null>(null);
-  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
 
   // Forgot password
   const [resetEmail, setResetEmail] = useState('');
@@ -102,37 +92,7 @@ export default function ModernAuth({
 
     try {
       const result = await firebaseAuthService.login(email, password);
-      const userWithIdentity = {
-        ...result.user,
-        portal_identity: result.user.portal_identity || loginIdentity
-      };
-      firebaseAuthService.setUser(userWithIdentity);
-      onLoginSuccess(userWithIdentity);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const result = await firebaseAuthService.register(email, password, firstName, lastName, identity, profilePicture);
+      firebaseAuthService.setUser(result.user);
       onLoginSuccess(result.user);
     } catch (err: any) {
       setError(err.message);
@@ -141,31 +101,6 @@ export default function ModernAuth({
     }
   };
 
-  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        setError('Profile picture must be less than 5MB');
-        return;
-      }
-
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        setError('Profile picture must be an image file');
-        return;
-      }
-
-      setProfilePicture(file);
-
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfilePicturePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -229,7 +164,7 @@ export default function ModernAuth({
             <div className="flex flex-col items-center justify-center gap-3 mb-4">
               <img src={customBrandLogoUrl} alt="Portal Logo" className="h-14 w-auto object-contain" referrerPolicy="no-referrer" onError={(event) => { (event.currentTarget as HTMLImageElement).src = 'https://i.imgur.com/8PoFnhE.png'; }} />
               <h1 className="text-2xl md:text-3xl font-bold text-white">
-                {loginIdentity === 'IT Support' ? 'IT Support Portal' : 'Memo Approval Portal'}
+                Memo Portal Login
               </h1>
             </div>
           </div>
@@ -245,19 +180,6 @@ export default function ModernAuth({
           {/* Login form */}
           {mode === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-200 mb-2">Sign in as</label>
-                <select
-                  value={loginIdentity}
-                  onChange={(e) => setLoginIdentity(e.target.value)}
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
-                >
-                  {IDENTITIES.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-slate-200 mb-2">Email Address</label>
                 <div className="relative">
@@ -307,7 +229,7 @@ export default function ModernAuth({
                   </>
                 ) : (
                   <>
-                    Sign In as {loginIdentity}
+                    Sign In
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -327,123 +249,29 @@ export default function ModernAuth({
                 onClick={() => setMode('register')}
                 className="w-full text-sm text-slate-400 hover:text-slate-300 py-2"
               >
-                Don't have an account? <span className="text-blue-400">Sign up</span>
+                IT must create user accounts. Contact your IT administrator.
               </button>
             </form>
           )}
 
           {/* Register form */}
           {mode === 'register' && (
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-slate-200 mb-2">First Name</label>
-                  <input
-                    type="text"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                    placeholder="John"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-200 mb-2">Last Name</label>
-                  <input
-                    type="text"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                    placeholder="Doe"
-                    required
-                  />
-                </div>
+            <div className="space-y-4">
+              <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl text-slate-300">
+                <h3 className="text-sm font-semibold text-white">Account creation is restricted.</h3>
+                <p className="text-xs text-slate-400 mt-2">
+                  User accounts must be created by IT and roles assigned according to approval level. Please contact your IT administrator to request access.
+                </p>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-200 mb-2">Email Address</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                  placeholder="your@email.com"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-200 mb-2">Portal Identity</label>
-                <select
-                  value={identity}
-                  onChange={(e) => setIdentity(e.target.value)}
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
-                >
-                  {IDENTITIES.map((option) => (
-                    <option key={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-200 mb-2">Profile Picture (Optional)</label>
-                <div className="flex items-center gap-4">
-                  <div className="flex-1">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleProfilePictureChange}
-                      className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-2 text-white text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
-                    />
-                  </div>
-                  {profilePicturePreview && (
-                    <div className="flex-shrink-0">
-                      <img src={profilePicturePreview} alt="Preview" className="h-16 w-16 rounded-full object-cover border border-slate-600" />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-200 mb-2">Password</label>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                  placeholder="••••••••"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-200 mb-2">Confirm Password</label>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                  placeholder="••••••••"
-                  required
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white font-semibold py-2 rounded-lg transition-all"
-              >
-                {loading ? 'Creating account...' : 'Create Account'}
-              </button>
 
               <button
                 type="button"
                 onClick={() => setMode('login')}
                 className="w-full text-sm text-slate-400 hover:text-slate-300 py-2"
               >
-                Already have an account? <span className="text-blue-400">Sign in</span>
+                Back to Login
               </button>
-            </form>
+            </div>
           )}
 
           {/* Forgot password form */}

@@ -221,12 +221,51 @@ class FirebaseAuthService {
   }
 
   /**
+   * Fallback: Login via server API instead of Firebase
+   * Used when Firebase is unavailable or user is server-only
+   */
+  private async serverLogin(email: string, password: string): Promise<AuthResponse> {
+    const apiBase = import.meta.env.VITE_API_URL || '/api';
+    const response = await fetch(`${apiBase}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || 'Server login failed');
+    }
+
+    const data = await response.json();
+    const token = data.token || data.access_token;
+    const user = data.user;
+
+    if (!token || !user) {
+      throw new Error('Invalid server response: missing token or user');
+    }
+
+    // Store token and user
+    localStorage.setItem(this.tokenKey, token);
+    this.setUser(user);
+
+    return {
+      token,
+      expiresIn: data.expiresIn || '24h',
+      user
+    };
+  }
+
+  /**
    * Login user with email and password
+   * Tries Firebase first, falls back to server auth on credential errors
    */
   async login(email: string, password: string): Promise<AuthResponse> {
     if (!isConfigured || !auth || !firestore) {
       if (!USE_FIREBASE_MOCK) {
-        throw new Error('Firebase is not configured. Please check FIREBASE_SETUP.md and set environment variables in .env.local');
+        // Firebase not configured; try server fallback
+        console.log('Firebase not configured, attempting server login...');
+        return this.serverLogin(email, password);
       }
       // Local mock login
       const mockUsersKey = 'mock_users';
@@ -275,6 +314,17 @@ class FirebaseAuthService {
       };
     } catch (error: any) {
       console.error('Firebase login error:', error?.code || 'no-code', error?.message || String(error), error);
+      
+      // Fallback to server auth on credential errors or network issues
+      if (error?.code === 'auth/invalid-credential' || error?.code === 'auth/user-not-found' || error?.code === 'auth/wrong-password') {
+        console.log('Firebase auth failed, trying server login fallback...');
+        try {
+          return await this.serverLogin(email, password);
+        } catch (serverErr: any) {
+          throw new Error(serverErr.message || 'Both Firebase and server authentication failed');
+        }
+      }
+      
       throw new Error(error.message || 'Login failed');
     }
   }

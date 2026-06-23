@@ -234,6 +234,40 @@ router.get('/auth/me', authenticateToken, async (req: Request, res: Response) =>
   }
 });
 
+// Internal one-time bootstrap endpoint to create the first System Administrator.
+// Protect with INIT_BOOTSTRAP_SECRET env var and only allow when no users exist.
+router.post('/internal/bootstrap-admin', async (req: Request, res: Response) => {
+  try {
+    const providedSecret = (req.headers['x-bootstrap-secret'] as string) || (req.query?.secret as string) || '';
+    const configured = process.env.INIT_BOOTSTRAP_SECRET;
+    if (!configured) {
+      return res.status(403).json({ error: 'Bootstrap secret not configured on server' });
+    }
+
+    if (!providedSecret || providedSecret !== configured) {
+      return res.status(403).json({ error: 'Invalid bootstrap secret' });
+    }
+
+    // Ensure this is only used when there are no users in the system
+    const countResult = await (await import('../db/db')).query('SELECT COUNT(*) FROM users');
+    const count = Number(countResult.rows[0]?.count || 0);
+    if (count > 0) {
+      return res.status(400).json({ error: 'Bootstrap not allowed: users already exist' });
+    }
+
+    const { email, password, firstName, lastName, department } = req.body;
+    if (!email || !password || !firstName || !lastName) {
+      return res.status(400).json({ error: 'Missing required fields: email, password, firstName, lastName' });
+    }
+
+    const result = await registerUser(email, password, firstName, lastName, department || 'IT & Systems', null);
+    return res.status(201).json(result);
+  } catch (error: any) {
+    console.error('Bootstrap admin error:', error);
+    return res.status(500).json({ error: error?.message || String(error) });
+  }
+});
+
 // Update user profile
 router.put('/auth/profile', authenticateToken, async (req: Request, res: Response) => {
   try {
