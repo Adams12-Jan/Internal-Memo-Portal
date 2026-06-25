@@ -5,7 +5,8 @@ import {
   sendPasswordResetEmail,
   confirmPasswordReset,
   updateProfile as firebaseUpdateProfile,
-  User as FirebaseUser
+  User as FirebaseUser,
+  type Auth
 } from 'firebase/auth';
 import {
   collection,
@@ -18,10 +19,11 @@ import {
   where,
   Timestamp,
   DocumentData,
-  QuerySnapshot
+  QuerySnapshot,
+  type Firestore
 } from 'firebase/firestore';
 import { UserRole } from '../types';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject, type FirebaseStorage } from 'firebase/storage';
 import { auth, firestore, storage, isConfigured } from '../firebase';
 
 const USE_FIREBASE_MOCK = import.meta.env.VITE_USE_FIREBASE_MOCK === 'true';
@@ -49,6 +51,12 @@ export interface AuthResponse {
 class FirebaseAuthService {
   private userKey = 'auth_user';
   private tokenKey = 'auth_token';
+
+  private ensureFirebaseReady(): void {
+    if (!isConfigured || !auth || !firestore || !storage) {
+      throw new Error('Firebase is not configured. Please check FIREBASE_SETUP.md and set environment variables in .env.local');
+    }
+  }
 
   private mapPortalIdentityToRole(portalIdentity?: string): UserRole {
     const roleMapping: Record<string, UserRole> = {
@@ -99,8 +107,8 @@ class FirebaseAuthService {
     portalIdentity?: string,
     profilePicture?: File | null
   ): Promise<AuthResponse> {
-    if (!isConfigured || !auth || !firestore || !storage) {
-      if (!USE_FIREBASE_MOCK) {
+    if (USE_FIREBASE_MOCK || !isConfigured || !auth || !firestore || !storage) {
+      if (!USE_FIREBASE_MOCK && (!isConfigured || !auth || !firestore || !storage)) {
         throw new Error('Firebase is not configured. Please check FIREBASE_SETUP.md and set environment variables in .env.local');
       }
       // Fallback local dev implementation when mock is enabled: store mock user in localStorage
@@ -110,6 +118,12 @@ class FirebaseAuthService {
       if (users.find(u => u.email === email)) {
         throw new Error('That email is already registered. Please login or use a different address.');
       }
+      
+      // Only allow registration if no users exist
+      if (users.length > 0) {
+        throw new Error('Self-registration is disabled. Please contact IT Support or your System Administrator to create an account.');
+      }
+      
       const id = `mock-${Date.now()}`;
       const user: AuthUser = {
         id,
@@ -133,6 +147,12 @@ class FirebaseAuthService {
     }
 
     try {
+      // Check if users already exist in Firestore
+      const usersSnapshot = await getDocs(collection(firestore, 'users'));
+      if (usersSnapshot.size > 0) {
+        throw new Error('Self-registration is disabled. Please contact IT Support or your System Administrator to create an account.');
+      }
+
       // Create Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
@@ -261,37 +281,38 @@ class FirebaseAuthService {
    * Tries Firebase first, falls back to server auth on credential errors
    */
   async login(email: string, password: string): Promise<AuthResponse> {
-    if (!isConfigured || !auth || !firestore) {
-      if (!USE_FIREBASE_MOCK) {
-        // Firebase not configured; try server fallback
-        console.log('Firebase not configured, attempting server login...');
+    if (USE_FIREBASE_MOCK || !isConfigured || !auth || !firestore) {
+      if (USE_FIREBASE_MOCK) {
+        const mockUsersKey = 'mock_users';
+        const usersJson = localStorage.getItem(mockUsersKey) || '[]';
+        const users = JSON.parse(usersJson) as any[];
+        const match = users.find(u => u.email === email && u.password === password);
+        if (match) {
+          const user: AuthUser = {
+            id: match.id,
+            email: match.email,
+            first_name: match.first_name,
+            last_name: match.last_name,
+            department: match.department,
+            portal_identity: match.portal_identity,
+            role: match.role,
+            profile_picture_url: match.profile_picture_url,
+            is_active: match.is_active,
+            is_verified: match.is_verified,
+            created_at: match.created_at
+          };
+          const token = `mock-token-${Date.now()}`;
+          localStorage.setItem(this.tokenKey, token);
+          this.setUser(user);
+          return { token, expiresIn: '0', user };
+        }
+        console.log('Mock login did not find a local user; attempting server login fallback...');
         return this.serverLogin(email, password);
       }
-      // Local mock login
-      const mockUsersKey = 'mock_users';
-      const usersJson = localStorage.getItem(mockUsersKey) || '[]';
-      const users = JSON.parse(usersJson) as any[];
-      const match = users.find(u => u.email === email && u.password === password);
-      if (!match) {
-        throw new Error('Invalid credentials (mock)');
-      }
-      const user: AuthUser = {
-        id: match.id,
-        email: match.email,
-        first_name: match.first_name,
-        last_name: match.last_name,
-        department: match.department,
-        portal_identity: match.portal_identity,
-        role: match.role,
-        profile_picture_url: match.profile_picture_url,
-        is_active: match.is_active,
-        is_verified: match.is_verified,
-        created_at: match.created_at
-      };
-      const token = `mock-token-${Date.now()}`;
-      localStorage.setItem(this.tokenKey, token);
-      this.setUser(user);
-      return { token, expiresIn: '0', user };
+
+      // Firebase not configured; try server fallback
+      console.log('Firebase not configured, attempting server login...');
+      return this.serverLogin(email, password);
     }
 
     try {
@@ -314,18 +335,13 @@ class FirebaseAuthService {
       };
     } catch (error: any) {
       console.error('Firebase login error:', error?.code || 'no-code', error?.message || String(error), error);
-      
-      // Fallback to server auth on credential errors or network issues
-      if (error?.code === 'auth/invalid-credential' || error?.code === 'auth/user-not-found' || error?.code === 'auth/wrong-password') {
-        console.log('Firebase auth failed, trying server login fallback...');
-        try {
-          return await this.serverLogin(email, password);
-        } catch (serverErr: any) {
-          throw new Error(serverErr.message || 'Both Firebase and server authentication failed');
-        }
+      console.log('Firebase auth failed, attempting server login fallback...');
+      try {
+        return await this.serverLogin(email, password);
+      } catch (serverErr: any) {
+        console.error('Server login fallback failed:', serverErr?.message || serverErr);
+        throw new Error(serverErr?.message || error?.message || 'Login failed');
       }
-      
-      throw new Error(error.message || 'Login failed');
     }
   }
 
@@ -354,7 +370,9 @@ class FirebaseAuthService {
           created_at: match.created_at
         };
       }
+      throw new Error('Firebase is not configured and no local mock user exists');
     }
+    this.ensureFirebaseReady();
     const userRef = doc(firestore, 'users', firebaseUser.uid);
     const userDoc = await getDoc(userRef);
 
@@ -431,8 +449,9 @@ class FirebaseAuthService {
    * Note: In Firebase, you typically use the code from the email link
    */
   async resetPassword(token: string, newPassword: string): Promise<void> {
+    this.ensureFirebaseReady();
     try {
-      await confirmPasswordReset(auth, token, newPassword);
+      await confirmPasswordReset(auth as Auth, token, newPassword);
     } catch (error: any) {
       console.error('Reset password error:', error?.code || 'no-code', error?.message || String(error), error);
       throw new Error(error.message || 'Password reset failed');
@@ -748,14 +767,16 @@ class FirebaseAuthService {
    * Upload profile picture
    */
   async uploadProfilePicture(userId: string, file: File): Promise<string> {
+    this.ensureFirebaseReady();
     try {
+      this.ensureFirebaseReady();
       const fileName = `${userId}-${Date.now()}`;
-      const imageRef = storageRef(storage, `profile-pictures/${fileName}`);
+      const imageRef = storageRef(storage as FirebaseStorage, `profile-pictures/${fileName}`);
       await uploadBytes(imageRef, file);
       const url = await getDownloadURL(imageRef);
 
       // Update user's profile picture URL in Firestore
-      await updateDoc(doc(firestore, 'users', userId), {
+      await updateDoc(doc(firestore as Firestore, 'users', userId), {
         profile_picture_url: url
       });
 
@@ -774,13 +795,14 @@ class FirebaseAuthService {
    * Delete profile picture
    */
   async deleteProfilePicture(userId: string, pictureUrl: string): Promise<void> {
+    this.ensureFirebaseReady();
     try {
       // Delete from Storage
-      const imageRef = storageRef(storage, pictureUrl);
+      const imageRef = storageRef(storage as FirebaseStorage, pictureUrl);
       await deleteObject(imageRef);
 
       // Update user document
-      await updateDoc(doc(firestore, 'users', userId), {
+      await updateDoc(doc(firestore as Firestore, 'users', userId), {
         profile_picture_url: null
       });
     } catch (error: any) {

@@ -17,9 +17,13 @@ import {
   clearUserProfile,
   resetUserPasswordByAdmin,
   verifyToken,
-  updateUserProfile
+  getUserByEmail,
+  getUserByFirebaseUid,
+  linkFirebaseIdentity
 } from '../services/authService';
+import { query } from '../db/db';
 import { logAuditEvent } from '../services/cmsService';
+import { firebaseAdminAuth } from '../services/firebaseAdmin';
 
 const router = express.Router();
 
@@ -60,9 +64,23 @@ const upload = multer({
   fileFilter
 });
 
+const registerUploadMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  const contentType = (req.headers['content-type'] || '').toString();
+  if (contentType.includes('multipart/form-data')) {
+    upload.single('profilePicture')(req, res, (err: any) => {
+      if (err) {
+        console.error('Multer error on register:', err);
+        return res.status(400).json({ error: err.message || 'File upload failed' });
+      }
+      next();
+    });
+  } else {
+    next();
+  }
+};
 
-// Middleware to verify JWT token
-export function authenticateToken(req: Request, res: Response, next: NextFunction) {
+// Middleware to verify JWT token or Firebase ID token
+export async function authenticateToken(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization as string | undefined;
   const tokenFromHeader = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader;
   const token = tokenFromHeader || (req.headers['x-access-token'] as string | undefined) || (req.query?.token as string | undefined);
@@ -71,29 +89,64 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ error: 'Missing authentication token' });
   }
 
-  const payload = verifyToken(token);
-  if (!payload) {
-    return res.status(403).json({ error: 'Invalid or expired token' });
-  }
+  try {
+    let internalUserId: string | null = null;
+    const jwtPayload = verifyToken(token);
 
-  (req as any).userId = payload.userId;
-  next();
+    if (jwtPayload) {
+      internalUserId = jwtPayload.userId;
+    } else if (firebaseAdminAuth) {
+      try {
+        const decoded = await firebaseAdminAuth.verifyIdToken(token);
+        if (decoded?.uid) {
+          const linkedUser = await getUserByFirebaseUid(decoded.uid);
+          if (linkedUser) {
+            internalUserId = linkedUser.id;
+          } else if (decoded.email) {
+            const emailUser = await getUserByEmail(decoded.email);
+            if (emailUser) {
+              internalUserId = emailUser.id;
+              await linkFirebaseIdentity(emailUser.id, decoded.uid);
+            }
+          }
+        }
+      } catch (firebaseError) {
+        // invalid Firebase token, we'll reject below
+      }
+    }
+
+    if (!internalUserId) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+
+    (req as any).userId = internalUserId;
+    next();
+  } catch (error: any) {
+    console.error('Authentication middleware error:', error);
+    res.status(403).json({ error: 'Invalid or expired token' });
+  }
 }
 
 // ============ AUTH ROUTES ============
 
 // Register with email/password
-router.post('/auth/register', upload.single('profilePicture'), async (req: Request, res: Response) => {
+router.post('/auth/register', registerUploadMiddleware, async (req: Request, res: Response) => {
   try {
-    // Debug logging
     console.log('Register request received');
+    console.log('req.headers[content-type]:', req.headers['content-type']);
     console.log('req.body:', req.body);
     console.log('req.file:', req.file ? { filename: req.file.filename, size: req.file.size, mimetype: req.file.mimetype } : 'none');
-    
-    const { email, password, firstName, lastName, department } = req.body;
+
+    const body = typeof req.body === 'object' && req.body !== null ? req.body : {};
+    const { email, password, firstName, lastName, department } = body as {
+      email?: string;
+      password?: string;
+      firstName?: string;
+      lastName?: string;
+      department?: string;
+    };
 
     if (!email || !password || !firstName || !lastName) {
-      // Clean up uploaded file if validation fails
       if (req.file) {
         fs.unlink(req.file.path, () => {});
       }
@@ -101,33 +154,40 @@ router.post('/auth/register', upload.single('profilePicture'), async (req: Reque
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Generate profile picture URL if file was uploaded
-    let profilePictureUrl = null;
+    // Delegate existence and first-user checks to the service layer.
+    // The service will use the DB when available or a dev fallback when not.
+
+    let profilePictureUrl: string | null = null;
     if (req.file) {
       profilePictureUrl = `/uploads/profile-pictures/${req.file.filename}`;
     }
 
     const result = await registerUser(email, password, firstName, lastName, department, profilePictureUrl);
-
-    // Log audit event
-    await logAuditEvent(
-      result.user.id,
-      'USER_REGISTERED',
-      'USER',
-      result.user.id,
-      null,
-      { email, firstName, lastName, hasProfilePicture: !!profilePictureUrl },
-      req.ip,
-      req.get('user-agent')
-    );
-
     res.status(201).json(result);
+
+    try {
+      await logAuditEvent(
+        result.user.id,
+        'USER_REGISTERED',
+        'USER',
+        result.user.id,
+        null,
+        { email, firstName, lastName, hasProfilePicture: !!profilePictureUrl },
+        req.ip,
+        req.get('user-agent')
+      );
+    } catch (auditError) {
+      console.error('Failed to log audit event:', auditError);
+    }
   } catch (error: any) {
-    // Clean up uploaded file if registration fails
     if ((req as any).file) {
       fs.unlink((req as any).file.path, () => {});
     }
-    res.status(400).json({ error: error.message });
+    console.error('Registration error:', error);
+    const errorMessage = error?.message || 'Registration failed';
+    const clientErrors = ['Self-registration is disabled', 'Email already registered', 'Missing required fields'];
+    const status = clientErrors.some(msg => errorMessage.includes(msg)) ? 400 : 500;
+    res.status(status).json({ error: errorMessage });
   }
 });
 
@@ -142,19 +202,23 @@ router.post('/auth/login', async (req: Request, res: Response) => {
 
     const result = await loginUser(email, password);
 
-    // Log audit event
-    await logAuditEvent(
-      result.user.id,
-      'USER_LOGGED_IN',
-      'USER',
-      result.user.id,
-      null,
-      null,
-      req.ip,
-      req.get('user-agent')
-    );
+    // Log audit event, but don't fail login if audit storage is unavailable
+    try {
+      await logAuditEvent(
+        result.user.id,
+        'USER_LOGGED_IN',
+        'USER',
+        result.user.id,
+        null,
+        null,
+        req.ip,
+        req.get('user-agent')
+      );
+    } catch (auditErr) {
+      console.error('Failed to log login audit event:', auditErr);
+    }
 
-    res.json(result);
+    return res.json(result);
   } catch (error: any) {
     res.status(401).json({ error: error.message });
   }
@@ -212,6 +276,21 @@ router.post('/auth/verify-email', async (req: Request, res: Response) => {
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
+});
+
+// Debug endpoint to inspect incoming auth token and header
+router.get('/auth/debug', (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization as string | undefined;
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader;
+  const verified = token ? verifyToken(token) : null;
+
+  res.json({
+    authorizationHeader: authHeader || null,
+    token: token || null,
+    tokenPayload: verified || null,
+    tokenPresent: !!token,
+    tokenValid: !!verified
+  });
 });
 
 // Get current user
@@ -276,11 +355,11 @@ router.put('/auth/profile', authenticateToken, async (req: Request, res: Respons
 
     const oldUser = await getUserById(userId);
 
-    const updatedUser = await updateUserProfile(userId, {
-      first_name: firstName,
-      last_name: lastName,
+    const updatedUser = await updateUserAccount(userId, {
+      firstName,
+      lastName,
       department,
-      profile_picture_url: profilePictureUrl
+      profilePictureUrl
     });
 
     // Log audit event
@@ -343,20 +422,33 @@ router.post('/auth/users', authenticateToken, async (req: Request, res: Response
       isActive !== undefined ? !!isActive : true
     );
 
-    await logAuditEvent(
-      userId,
-      'USER_ACCOUNT_CREATED',
-      'USER',
-      newUser.id,
-      null,
-      newUser,
-      req.ip,
-      req.get('user-agent')
-    );
+    try {
+      await logAuditEvent(
+        userId,
+        'USER_ACCOUNT_CREATED',
+        'USER',
+        newUser.id,
+        null,
+        newUser,
+        req.ip,
+        req.get('user-agent')
+      );
+    } catch (auditError) {
+      console.error('Failed to log audit event for user creation:', auditError);
+    }
 
     res.status(201).json(newUser);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('Create user account error:', error);
+    const errorMessage = error?.message || error?.detail || error?.code || String(error) || 'Internal server error';
+    const status = errorMessage.includes('Admin privileges required')
+      ? 403
+      : /Email already registered|required|not found|invalid|disabled|connection refused|econnrefused/i.test(errorMessage)
+      ? 400
+      : 500;
+
+    // Ensure we always send a non-empty message so frontend can display meaningful information.
+    res.status(status).json({ error: errorMessage || 'Internal server error' });
   }
 });
 
@@ -379,12 +471,11 @@ router.put('/auth/users/:id', authenticateToken, async (req: Request, res: Respo
     const oldUser = { ...targetUser };
 
     const updatedUser = await updateUserAccount(req.params.id, {
-      first_name: firstName,
-      last_name: lastName,
+      firstName,
+      lastName,
       department,
       role,
-      profile_picture_url: profilePictureUrl,
-      is_active: isActive
+      profilePictureUrl
     });
 
     if (resetPassword) {
@@ -490,7 +581,7 @@ router.patch('/auth/users/:id/status', authenticateToken, async (req: Request, r
       return res.status(404).json({ error: 'Target user not found' });
     }
 
-    const updatedUser = await updateUserAccount(req.params.id, { is_active: !!isActive });
+    const updatedUser = await updateUserAccount(req.params.id, { isActive: !!isActive });
 
     await logAuditEvent(
       userId,

@@ -60,14 +60,22 @@ class AuthService {
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Registration failed');
+        try {
+          const data = await response.json();
+          throw new Error(data.error || 'Registration failed');
+        } catch (e) {
+          throw new Error(`Registration failed: ${response.statusText}`);
+        }
       }
 
-      const data = await response.json();
-      this.setToken(data.token);
-      this.setUser(data.user);
-      return data;
+      try {
+        const data = await response.json();
+        this.setToken(data.token);
+        this.setUser(data.user);
+        return data;
+      } catch (parseError) {
+        throw new Error('Invalid response from server. Please try again.');
+      }
     } else {
       // Original JSON-based registration
       const response = await fetch(`${API_BASE}/auth/register`, {
@@ -77,14 +85,22 @@ class AuthService {
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Registration failed');
+        try {
+          const data = await response.json();
+          throw new Error(data.error || 'Registration failed');
+        } catch (e) {
+          throw new Error(`Registration failed: ${response.statusText}`);
+        }
       }
 
-      const data = await response.json();
-      this.setToken(data.token);
-      this.setUser(data.user);
-      return data;
+      try {
+        const data = await response.json();
+        this.setToken(data.token);
+        this.setUser(data.user);
+        return data;
+      } catch (parseError) {
+        throw new Error('Invalid response from server. Please try again.');
+      }
     }
   }
 
@@ -196,8 +212,27 @@ class AuthService {
     });
 
     if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || 'Failed to create user');
+      const text = await response.text();
+      let message = response.statusText || 'Failed to create user';
+
+      try {
+        const data = JSON.parse(text);
+        if (data && typeof data === 'object') {
+          if (data.error) {
+            message = data.error;
+          } else if (data.message) {
+            message = data.message;
+          }
+        }
+      } catch {
+        // ignore JSON parse errors
+      }
+
+      if (!message || String(message).trim() === '') {
+        message = text || response.statusText || `Failed to create user (${response.status})`;
+      }
+
+      throw new Error(message);
     }
 
     return response.json();
@@ -252,11 +287,6 @@ class AuthService {
           normalized[key] = value.join(', ');
         }
       });
-    }
-
-    const token = this.getToken();
-    if (token) {
-      normalized.Authorization = `Bearer ${token}`;
     }
 
     return normalized;

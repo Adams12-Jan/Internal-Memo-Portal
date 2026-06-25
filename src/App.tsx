@@ -50,6 +50,7 @@ import Reports from './components/Reports';
 import AuditTrail from './components/AuditTrail';
 import NotificationBell from './components/NotificationBell';
 import ModernAuth from './components/ModernAuth';
+import ITSignupDashboard from './components/ITSignupDashboard';
 import CmsPortal from './components/CmsPortal';
 
 export default function App() {
@@ -176,7 +177,7 @@ export default function App() {
     let p500 = '#9F9055', p600 = '#9F9055', p700 = '#8A7C4A', p100 = '#E6E1C8', p50 = '#F9F8F3';
     
     if (pAccent === 'blue') {
-      p500 = '#2563EB'; p600 = '#1d4ed8'; p700 = '#1e40af'; p100 = '#dbeafe'; p50 = '#f0f9ff';
+      p500 = '#ffffff'; p600 = '#ffffff'; p700 = '#ffffff'; p100 = '#dbeafe'; p50 = '#f0f9ff';
     } else if (pAccent === 'purple') {
       p500 = '#8B5CF6'; p600 = '#7C3AED'; p700 = '#6D28D9'; p100 = '#f3e8ff'; p50 = '#faf5ff';
     } else if (pAccent === 'emerald') {
@@ -1479,6 +1480,17 @@ export default function App() {
   };
 
   if (!isLoggedIn) {
+    // If the user navigated to /it-signup, show the dedicated IT signup page
+    if (typeof window !== 'undefined' && window.location && window.location.pathname === '/it-signup') {
+      return (
+        <ITSignupDashboard
+          onLoginSuccess={handleLoginSuccess}
+          customBackgroundUrl={systemSettings.customBackgroundUrl}
+          customLogoUrl={systemSettings.customLogoUrl}
+        />
+      );
+    }
+
     return (
       <ModernAuth
         onLoginSuccess={handleLoginSuccess}

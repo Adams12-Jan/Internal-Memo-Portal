@@ -16,7 +16,9 @@
 
 import fs from 'fs';
 import path from 'path';
-import * as admin from 'firebase-admin';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 
 async function main() {
   const serviceAccountPath = path.join(process.cwd(), 'scripts', 'serviceAccountKey.json');
@@ -28,12 +30,12 @@ async function main() {
 
   const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
 
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
+  initializeApp({
+    credential: cert(serviceAccount)
   });
 
-  const auth = admin.auth();
-  const db = admin.firestore();
+  const auth = getAuth();
+  const db = getFirestore();
 
   const email = process.env.ADMIN_EMAIL || 'it.admin@example.com';
   const password = process.env.ADMIN_PASSWORD || 'ChangeMe123!';

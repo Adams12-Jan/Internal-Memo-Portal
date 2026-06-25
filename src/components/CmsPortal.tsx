@@ -419,6 +419,11 @@ export default function CmsPortal({
       return;
     }
 
+    if (!authClient.isAuthenticated()) {
+      alert('You must be signed in as an administrator to create a user account. Please log in and try again.');
+      return;
+    }
+
     if (newUserPassword !== newUserConfirmPassword) {
       alert('Passwords do not match. Please confirm the new password.');
       return;

@@ -1,4 +1,4 @@
-import { Pool, PoolClient } from 'pg';
+import { Pool } from 'pg';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -61,7 +61,7 @@ export async function query(text: string, params?: any[]) {
   }
 }
 
-export async function getClient(): Promise<PoolClient> {
+export async function getClient(): Promise<any> {
   return pool.connect();
 }
 
