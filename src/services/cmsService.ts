@@ -307,20 +307,30 @@ export async function logAuditEvent(
   ipAddress?: string,
   userAgent?: string
 ): Promise<void> {
-  await query(
-    `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [
-      userId,
-      action,
-      entityType,
-      entityId,
-      oldValues ? JSON.stringify(oldValues) : null,
-      newValues ? JSON.stringify(newValues) : null,
-      ipAddress,
-      userAgent
-    ]
-  );
+  try {
+    await query(
+      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        userId,
+        action,
+        entityType,
+        entityId,
+        oldValues ? JSON.stringify(oldValues) : null,
+        newValues ? JSON.stringify(newValues) : null,
+        ipAddress,
+        userAgent
+      ]
+    );
+  } catch (error: any) {
+    // For audit logging, fail silently on DB connection errors
+    // This prevents audit logging failures from blocking user operations
+    if (!(error?.code === 'ECONNREFUSED' || error?.errors?.some?.((e: any) => e?.code === 'ECONNREFUSED'))) {
+      throw error;
+    }
+    // Dev mode: skip audit logging
+    console.log('Audit log skipped (dev mode): DB unavailable');
+  }
 }
 
 export async function getAuditLogs(

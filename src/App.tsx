@@ -1693,6 +1693,7 @@ export default function App() {
                 id="mobile-menu-trigger-btn"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="p-2 text-white hover:text-white hover:bg-blue-700 border border-blue-700 rounded lg:hidden transition-all duration-150 active:scale-95"
+                aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
               >
                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>

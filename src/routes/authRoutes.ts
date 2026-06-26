@@ -495,7 +495,12 @@ router.put('/auth/users/:id', authenticateToken, async (req: Request, res: Respo
 
     res.json(updatedUser);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('Update user account error:', error);
+    const errorMessage = error?.message || error?.detail || error?.code || String(error) || 'Internal server error';
+    const status = /Admin privileges required|not found|invalid|disabled/i.test(errorMessage)
+      ? 400
+      : 500;
+    res.status(status).json({ error: errorMessage || 'Internal server error' });
   }
 });
 

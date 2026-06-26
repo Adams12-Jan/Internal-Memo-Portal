@@ -340,6 +340,7 @@ export default function ModernAuth({
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-3 text-slate-500 hover:text-slate-300"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -480,6 +481,7 @@ export default function ModernAuth({
                     type="button"
                     onClick={() => setShowItPassword(!showItPassword)}
                     className="absolute right-3 top-3 text-slate-500 hover:text-slate-300"
+                    aria-label={showItPassword ? 'Hide password' : 'Show password'}
                   >
                     {showItPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>

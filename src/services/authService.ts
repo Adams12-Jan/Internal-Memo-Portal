@@ -691,7 +691,24 @@ export async function resetUserPasswordByAdmin(userId: string, newPassword: stri
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, userId]);
   } catch (error: any) {
-    throw error;
+    const isConnRefused = isDbConnectionRefusedError(error);
+    if (!isConnRefused) {
+      throw error;
+    }
+
+    // Dev mode fallback
+    const devData = await readDevData();
+    const userIndex = devData.users.findIndex(u => u.id === userId);
+
+    if (userIndex === -1) {
+      throw new Error('User not found');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    devData.users[userIndex].password_hash = passwordHash;
+
+    const devFile = path.resolve(process.cwd(), 'dev_users.json');
+    await fs.writeFile(devFile, JSON.stringify(devData, null, 2), 'utf-8');
   }
 }
 

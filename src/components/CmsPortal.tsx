@@ -84,6 +84,12 @@ export default function CmsPortal({
   const [newUserDept, setNewUserDept] = useState('IT & Systems');
   const [newUserIsActive, setNewUserIsActive] = useState(true);
 
+  // Password reset modal state
+  const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
+  const [passwordResetUser, setPasswordResetUser] = useState<AuthUser | null>(null);
+  const [passwordResetValue, setPasswordResetValue] = useState('');
+  const [passwordResetConfirm, setPasswordResetConfirm] = useState('');
+
   // 3. Deals state
   const [dealsLoading, setDealsLoading] = useState(false);
   const [dealsError, setDealsError] = useState<string | null>(null);
@@ -419,11 +425,6 @@ export default function CmsPortal({
       return;
     }
 
-    if (!authClient.isAuthenticated()) {
-      alert('You must be signed in as an administrator to create a user account. Please log in and try again.');
-      return;
-    }
-
     if (newUserPassword !== newUserConfirmPassword) {
       alert('Passwords do not match. Please confirm the new password.');
       return;
@@ -473,18 +474,44 @@ export default function CmsPortal({
     }
   };
 
-  const handleResetUserPassword = async (user: AuthUser) => {
-    const newPassword = prompt(`Enter a new password for ${user.email}:`, '');
-    if (!newPassword) {
+  const handleResetUserPassword = (user: AuthUser) => {
+    setPasswordResetUser(user);
+    setPasswordResetValue('');
+    setPasswordResetConfirm('');
+    setShowPasswordResetModal(true);
+  };
+
+  const handleConfirmPasswordReset = async () => {
+    if (!passwordResetUser) return;
+    
+    if (!passwordResetValue.trim()) {
+      alert('Password cannot be empty.');
+      return;
+    }
+
+    if (passwordResetValue !== passwordResetConfirm) {
+      alert('Passwords do not match.');
       return;
     }
 
     try {
-      await authClient.updateUser(user.id, { resetPassword: newPassword });
+      await authClient.updateUser(passwordResetUser.id, { resetPassword: passwordResetValue });
       alert('Password reset successfully.');
+      setShowPasswordResetModal(false);
+      setPasswordResetUser(null);
+      setPasswordResetValue('');
+      setPasswordResetConfirm('');
+      fetchUsers();
     } catch (err: any) {
       alert(`Error resetting password: ${err?.message || err}`);
     }
+  };
+
+  const handleCancelPasswordReset = () => {
+    setShowPasswordResetModal(false);
+    setPasswordResetUser(null);
+    setPasswordResetValue('');
+    setPasswordResetConfirm('');
   };
 
   const handleClearUserProfile = async (user: AuthUser) => {
@@ -2073,6 +2100,61 @@ export default function CmsPortal({
                 className="bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold py-1.5 px-4 rounded-lg cursor-pointer"
               >
                 Close Audit Inspection
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Password Reset Modal */}
+      {showPasswordResetModal && passwordResetUser && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex justify-center items-center p-4 z-50 animate-fade-in">
+          <div className="bg-white border rounded-2xl max-w-md w-full shadow-2xl">
+            
+            <div className="p-4 bg-blue-600 text-white border-b border-blue-700 flex justify-between items-center rounded-t-2xl">
+              <div className="min-w-0">
+                <span className="text-[9px] uppercase tracking-wider text-blue-200 font-mono block">Reset User Password</span>
+                <h4 className="font-bold text-sm mt-1 text-blue-100">Reset password for {passwordResetUser.email}</h4>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">New Password *</label>
+                <input
+                  type="password"
+                  value={passwordResetValue}
+                  onChange={(e) => setPasswordResetValue(e.target.value)}
+                  placeholder="Enter new password"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Confirm Password *</label>
+                <input
+                  type="password"
+                  value={passwordResetConfirm}
+                  onChange={(e) => setPasswordResetConfirm(e.target.value)}
+                  placeholder="Confirm new password"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+              <button
+                onClick={handleCancelPasswordReset}
+                className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-sm font-bold py-2 px-4 rounded-lg cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmPasswordReset}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-4 rounded-lg cursor-pointer"
+              >
+                Reset Password
               </button>
             </div>
 
