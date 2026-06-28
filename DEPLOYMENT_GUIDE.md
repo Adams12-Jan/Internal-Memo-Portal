@@ -114,11 +114,74 @@ curl https://internal-memo-api.onrender.com/api/status
 
 ## Troubleshooting
 
-### 405 Error Still Appears
+### 405 Error (Method Not Allowed)
+
+A 405 error means the backend received a request but the HTTP method (GET/POST/etc.) doesn't match what the endpoint expects.
+
+#### Likely Causes
+
+1. **Frontend requesting wrong endpoint**
+   - Check `src/services/authClient.ts` - verify it's POST-ing to `/api/auth/login` (not GET)
+   - Check `src/services/cmsClient.ts` - verify HTTP methods match backend routes
+
+2. **API URL not configured**
+   - Vercel doesn't see `VITE_API_URL` → Frontend sends requests to `/api` → Static server returns 405
+   - **Solution**: Add `VITE_API_URL=https://internal-memo-api.onrender.com` to Vercel env vars
+
+3. **Backend not running on Render**
+   - Frontend tries to reach Render URL but backend failed to start
+   - **Debug**: `curl https://internal-memo-api.onrender.com/api/status`
+   - Check Render build logs if status returns 404/500
+
+4. **CORS mismatch**
+   - Frontend URL not in Render's `CORS_ORIGIN`
+   - **Solution**: Set `CORS_ORIGIN=https://your-vercel-domain.vercel.app` on Render
+
+#### How to Diagnose
+
+**Option 1: Automated Diagnostic Script**
+
+Run the diagnostic script to test your configuration:
+
+```powershell
+# Windows PowerShell
+./scripts/diagnose-405.ps1
+```
+
+Or bash (Linux/Mac):
+```bash
+chmod +x ./scripts/diagnose-405.sh
+./scripts/diagnose-405.sh
+```
+
+This will test:
+- ✓ Backend is running
+- ✓ Login endpoint responds correctly
+- ✓ CORS headers are configured
+- ✓ Frontend can reach backend
+
+**Option 2: Manual Debugging in Browser**
+
+```
+1. Open DevTools (F12)
+2. Go to Network tab
+3. Clear existing requests
+4. Try to log in
+5. Find the POST request to /api/auth/login
+6. Check:
+   - Status code (405 = method mismatch, 404 = route not found, 500 = server error)
+   - Request URL (should be https://internal-memo-api.onrender.com/api/auth/login)
+   - Response headers (look for CORS errors)
+   - If request URL shows /api/auth/login (not absolute URL), VITE_API_URL is not set
+```
+
+#### Quick Fixes
+
 - ✓ Check `VITE_API_URL` is set correctly in Vercel
 - ✓ Check `CORS_ORIGIN` is set correctly in Render
-- ✓ Verify Render backend is running: curl the `/api/status` endpoint
-- ✓ Clear browser cache and redeploy
+- ✓ Verify Render backend is running: `curl https://internal-memo-api.onrender.com/api/status`
+- ✓ Clear browser cache: DevTools → Network → Disable cache, hard refresh (Ctrl+Shift+R)
+- ✓ Redeploy Vercel after changing env vars: Deployments → Redeploy
 
 ### Render Build Fails
 - Check Render build logs (Logs tab)
@@ -133,6 +196,31 @@ curl https://internal-memo-api.onrender.com/api/status
 - Check the request to `/api/auth/login` (or `/auth/login`)
 - Look at response - if it's empty or 405, Render backend isn't responding
 - If you see CORS error, update `CORS_ORIGIN` on Render
+
+## API Endpoints Reference
+
+These endpoints are available on your Render backend:
+
+| Endpoint | Method | Purpose | Auth |
+|----------|--------|---------|------|
+| `/api/status` | GET | Health check | No |
+| `/api/auth/login` | POST | Log in with email/password | No |
+| `/api/auth/register` | POST | Create new account | No |
+| `/api/auth/forgot-password` | POST | Request password reset | No |
+| `/api/auth/reset-password` | POST | Reset password with token | No |
+| `/api/auth/verify-email` | POST | Verify email address | No |
+| `/api/auth/me` | GET | Get current user info | Yes |
+| `/api/auth/debug` | GET | Debug auth tokens | No |
+
+**Expected HTTP Status Codes:**
+- `200` - Success (GET)
+- `201` - Created (POST)
+- `400` - Bad request (missing fields)
+- `401` - Unauthorized (invalid credentials)
+- `403` - Forbidden (invalid token)
+- `404` - Not found (wrong URL)
+- `405` - Method not allowed (using GET instead of POST)
+- `500` - Server error (check Render logs)
 
 ## Quick Reference
 
