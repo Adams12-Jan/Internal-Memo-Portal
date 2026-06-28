@@ -36,7 +36,7 @@ function getDbErrorMessage(error: any): string {
   return 'Database error';
 }
 
-function isDbConnectionRefusedError(error: any): boolean {
+function shouldUseDevFallback(error: any): boolean {
   if (!error) {
     return false;
   }
@@ -44,14 +44,44 @@ function isDbConnectionRefusedError(error: any): boolean {
   const code = error.code || error.errno || error?.details;
   const message = String(error.message || error?.toString?.() || '').toLowerCase();
 
+  const fallbackCodes = new Set([
+    'ECONNREFUSED',
+    '57P01',
+    '28P01',
+    '28P02',
+    '28P03',
+    '3D000',
+    '3F000',
+    '42P01',
+    '42P02',
+    '42P03',
+    '42P04',
+    '42P05',
+    '42P06',
+    '42P07'
+  ]);
+
+  if (typeof code === 'string' && fallbackCodes.has(code)) {
+    return true;
+  }
+
+  if (typeof code === 'number' && fallbackCodes.has(String(code))) {
+    return true;
+  }
+
   return (
-    code === 'ECONNREFUSED' ||
-    code === '57P01' ||
     message.includes('econnrefused') ||
     message.includes('connection refused') ||
     message.includes('connect failed') ||
-    message.includes('database is not reachable')
+    message.includes('database is not reachable') ||
+    (message.includes('relation') && message.includes('does not exist')) ||
+    message.includes('undefined table') ||
+    (message.includes('database') && message.includes('does not exist'))
   );
+}
+
+function isDbConnectionRefusedError(error: any): boolean {
+  return shouldUseDevFallback(error);
 }
 
 async function readDevData(): Promise<{ users: any[]; emailTokens: any[] }> {
@@ -89,8 +119,8 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 
     return result.rows[0] || null;
   } catch (error: any) {
-    const isConnRefused = isDbConnectionRefusedError(error);
-    if (!isConnRefused) {
+    const useDevFallback = shouldUseDevFallback(error);
+    if (!useDevFallback) {
       throw error;
     }
 
@@ -110,8 +140,8 @@ export async function getUserByFirebaseUid(uid: string): Promise<User | null> {
 
     return result.rows[0] || null;
   } catch (error: any) {
-    const isConnRefused = isDbConnectionRefusedError(error);
-    if (!isConnRefused) {
+    const useDevFallback = shouldUseDevFallback(error);
+    if (!useDevFallback) {
       throw error;
     }
 
@@ -128,8 +158,8 @@ export async function linkFirebaseIdentity(userId: string, uid: string): Promise
       ['firebase', uid, userId]
     );
   } catch (error: any) {
-    const isConnRefused = isDbConnectionRefusedError(error);
-    if (!isConnRefused) {
+    const useDevFallback = shouldUseDevFallback(error);
+    if (!useDevFallback) {
       throw error;
     }
 
@@ -186,8 +216,8 @@ export async function registerUser(
       user
     };
   } catch (error: any) {
-    const isConnRefused = isDbConnectionRefusedError(error);
-    if (!isConnRefused) {
+    const useDevFallback = shouldUseDevFallback(error);
+    if (!useDevFallback) {
       throw error;
     }
 
@@ -273,8 +303,8 @@ export async function loginUser(email: string, password: string): Promise<AuthTo
       }
     };
   } catch (error: any) {
-    const isConnRefused = isDbConnectionRefusedError(error);
-    if (!isConnRefused) {
+    const useDevFallback = shouldUseDevFallback(error);
+    if (!useDevFallback) {
       throw error;
     }
 
@@ -325,8 +355,8 @@ export async function generatePasswordResetToken(email: string): Promise<string>
 
     return token;
   } catch (error: any) {
-    const isConnRefused = isDbConnectionRefusedError(error);
-    if (!isConnRefused) {
+    const useDevFallback = shouldUseDevFallback(error);
+    if (!useDevFallback) {
       throw error;
     }
 
@@ -413,8 +443,8 @@ export async function getUserById(userId: string): Promise<User | null> {
 
     return result.rows[0] || null;
   } catch (error: any) {
-    const isConnRefused = isDbConnectionRefusedError(error);
-    if (!isConnRefused) {
+    const useDevFallback = shouldUseDevFallback(error);
+    if (!useDevFallback) {
       throw error;
     }
 
@@ -436,8 +466,8 @@ export async function getUsers(limit = 100, offset = 0): Promise<User[]> {
 
     return result.rows;
   } catch (error: any) {
-    const isConnRefused = isDbConnectionRefusedError(error);
-    if (!isConnRefused) {
+    const useDevFallback = shouldUseDevFallback(error);
+    if (!useDevFallback) {
       throw error;
     }
 
@@ -511,8 +541,8 @@ export async function updateUserAccount(
 
     return result.rows[0];
   } catch (error: any) {
-    const isConnRefused = isDbConnectionRefusedError(error);
-    if (!isConnRefused) {
+    const useDevFallback = shouldUseDevFallback(error);
+    if (!useDevFallback) {
       throw error;
     }
 
@@ -571,8 +601,8 @@ export async function createUserAccount(
 
     return result.rows[0];
   } catch (error: any) {
-    const isConnRefused = isDbConnectionRefusedError(error);
-    if (!isConnRefused) {
+    const useDevFallback = shouldUseDevFallback(error);
+    if (!useDevFallback) {
       throw error;
     }
 
@@ -621,8 +651,8 @@ export async function deleteUserAccount(userId: string): Promise<User> {
 
     return result.rows[0];
   } catch (error: any) {
-    const isConnRefused = isDbConnectionRefusedError(error);
-    if (!isConnRefused) {
+    const useDevFallback = shouldUseDevFallback(error);
+    if (!useDevFallback) {
       throw error;
     }
 
@@ -659,8 +689,8 @@ export async function clearUserProfile(userId: string): Promise<User> {
 
     return result.rows[0];
   } catch (error: any) {
-    const isConnRefused = isDbConnectionRefusedError(error);
-    if (!isConnRefused) {
+    const useDevFallback = shouldUseDevFallback(error);
+    if (!useDevFallback) {
       throw error;
     }
 
@@ -691,8 +721,8 @@ export async function resetUserPasswordByAdmin(userId: string, newPassword: stri
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, userId]);
   } catch (error: any) {
-    const isConnRefused = isDbConnectionRefusedError(error);
-    if (!isConnRefused) {
+    const useDevFallback = shouldUseDevFallback(error);
+    if (!useDevFallback) {
       throw error;
     }
 

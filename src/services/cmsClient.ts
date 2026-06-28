@@ -1,4 +1,6 @@
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+import { getApiUrl } from './apiConfig';
+
+const API_BASE = '/api';
 
 export interface ContactPayload {
   name: string;
@@ -56,25 +58,54 @@ class CmsClient {
       ...(token ? { Authorization: `Bearer ${token}` } : {})
     };
 
-    const response = await fetch(input, { ...init, headers });
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(text || `Request failed: ${response.status}`);
+    try {
+      const response = await fetch(input, { ...init, headers });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || `Request failed: ${response.status}`);
+      }
+      return response.json();
+    } catch (err: any) {
+      // Try falling back to relative /api path when absolute host is unreachable
+      const inputStr = typeof input === 'string' ? input : (input as Request).url || '';
+      let fallbackPath = '/api';
+      try {
+        const idx = inputStr.indexOf('/api');
+        if (idx >= 0) {
+          fallbackPath = inputStr.slice(idx);
+        } else if (inputStr.startsWith('/')) {
+          fallbackPath = `/api${inputStr}`;
+        } else if (inputStr) {
+          fallbackPath = `/api/${inputStr}`;
+        }
+      } catch {
+        fallbackPath = '/api';
+      }
+
+      try {
+        const response2 = await fetch(fallbackPath, { ...init, headers });
+        if (!response2.ok) {
+          const text = await response2.text();
+          throw new Error(text || `Request failed: ${response2.status}`);
+        }
+        return response2.json();
+      } catch {
+        throw err;
+      }
     }
-    return response.json();
   }
 
   // ===== CONTACTS =====
   async getContacts(limit = 50, offset = 0) {
-    return this.fetchWithAuth(`${API_BASE}/cms/contacts?limit=${limit}&offset=${offset}`);
+    return this.fetchWithAuth(getApiUrl(`/cms/contacts?limit=${limit}&offset=${offset}`));
   }
 
   async searchContacts(query: string, limit = 50, offset = 0) {
-    return this.fetchWithAuth(`${API_BASE}/cms/contacts/search?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`);
+    return this.fetchWithAuth(getApiUrl(`/cms/contacts/search?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`));
   }
 
   async updateContact(id: string, payload: Partial<ContactPayload>) {
-    return this.fetchWithAuth(`${API_BASE}/cms/contacts/${encodeURIComponent(id)}`, {
+    return this.fetchWithAuth(getApiUrl(`/cms/contacts/${encodeURIComponent(id)}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -82,7 +113,7 @@ class CmsClient {
   }
 
   async createContact(payload: ContactPayload) {
-    return this.fetchWithAuth(`${API_BASE}/cms/contacts`, {
+    return this.fetchWithAuth(getApiUrl('/cms/contacts'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -90,16 +121,16 @@ class CmsClient {
   }
 
   async deleteContact(id: string) {
-    return this.fetchWithAuth(`${API_BASE}/cms/contacts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return this.fetchWithAuth(getApiUrl(`/cms/contacts/${encodeURIComponent(id)}`), { method: 'DELETE' });
   }
 
   // ===== DEALS =====
   async getDeals(limit = 50, offset = 0) {
-    return this.fetchWithAuth(`${API_BASE}/cms/deals?limit=${limit}&offset=${offset}`);
+    return this.fetchWithAuth(getApiUrl(`/cms/deals?limit=${limit}&offset=${offset}`));
   }
 
   async createDeal(payload: DealPayload) {
-    return this.fetchWithAuth(`${API_BASE}/cms/deals`, {
+    return this.fetchWithAuth(getApiUrl('/cms/deals'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -107,7 +138,7 @@ class CmsClient {
   }
 
   async updateDeal(id: string, payload: Partial<DealPayload>) {
-    return this.fetchWithAuth(`${API_BASE}/cms/deals/${encodeURIComponent(id)}`, {
+    return this.fetchWithAuth(getApiUrl(`/cms/deals/${encodeURIComponent(id)}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -115,14 +146,14 @@ class CmsClient {
   }
 
   async deleteDeal(id: string) {
-    return this.fetchWithAuth(`${API_BASE}/cms/deals/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return this.fetchWithAuth(getApiUrl(`/cms/deals/${encodeURIComponent(id)}`), { method: 'DELETE' });
   }
 
   async uploadMedia(file: File) {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(`${API_BASE}/files/upload`, {
+    const response = await fetch(getApiUrl('/files/upload'), {
       method: 'POST',
       body: formData
     });
@@ -137,11 +168,11 @@ class CmsClient {
 
   // ===== CAMPAIGNS =====
   async getCampaigns(limit = 50, offset = 0) {
-    return this.fetchWithAuth(`${API_BASE}/cms/campaigns?limit=${limit}&offset=${offset}`);
+    return this.fetchWithAuth(getApiUrl(`/cms/campaigns?limit=${limit}&offset=${offset}`));
   }
 
   async createCampaign(payload: CampaignPayload) {
-    return this.fetchWithAuth(`${API_BASE}/cms/campaigns`, {
+    return this.fetchWithAuth(getApiUrl('/cms/campaigns'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -149,7 +180,7 @@ class CmsClient {
   }
 
   async updateCampaign(id: string, payload: Partial<CampaignPayload>) {
-    return this.fetchWithAuth(`${API_BASE}/cms/campaigns/${encodeURIComponent(id)}`, {
+    return this.fetchWithAuth(getApiUrl(`/cms/campaigns/${encodeURIComponent(id)}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -157,7 +188,7 @@ class CmsClient {
   }
 
   async deleteCampaign(id: string) {
-    return this.fetchWithAuth(`${API_BASE}/cms/campaigns/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return this.fetchWithAuth(getApiUrl(`/cms/campaigns/${encodeURIComponent(id)}`), { method: 'DELETE' });
   }
 }
 

@@ -84,6 +84,21 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
   const authHeader = req.headers.authorization as string | undefined;
   const tokenFromHeader = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader;
   const token = tokenFromHeader || (req.headers['x-access-token'] as string | undefined) || (req.query?.token as string | undefined);
+  const devUserId = req.headers['x-dev-user-id'] as string | undefined;
+  const devAdminHeader = req.headers['x-dev-admin'] as string | undefined;
+  const isDevMode = process.env.NODE_ENV !== 'production';
+  const isDevAdmin = isDevMode && devAdminHeader === 'true';
+
+  console.debug('[auth] NODE_ENV=', process.env.NODE_ENV, 'isDevMode=', isDevMode, 'path=', req.path, 'token=', token, 'devUserId=', devUserId, 'devAdmin=', devAdminHeader);
+
+  if (isDevMode && devUserId && (!token || token.startsWith('mock-token-'))) {
+    (req as any).userId = devUserId;
+    if (isDevAdmin) {
+      (req as any).userRole = 'System Administrator';
+    }
+    console.debug('[auth] dev-mode auth applied', { userId: devUserId, userRole: (req as any).userRole });
+    return next();
+  }
 
   if (!token) {
     return res.status(401).json({ error: 'Missing authentication token' });
@@ -120,10 +135,43 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
     }
 
     (req as any).userId = internalUserId;
+
+    // Fetch user role for admin checks (in dev mode this reads from dev_users.json)
+    try {
+      const user = await getUserById(internalUserId);
+      if (user && user.role) {
+        (req as any).userRole = user.role;
+      }
+    } catch (error) {
+      // Log but don't fail auth; role checks later may deny access if needed
+      console.debug('[auth] Could not fetch user role:', error);
+    }
+
     next();
   } catch (error: any) {
     console.error('Authentication middleware error:', error);
     res.status(403).json({ error: 'Invalid or expired token' });
+  }
+}
+
+async function ensureSystemAdmin(req: Request): Promise<boolean> {
+  const userRole = (req as any).userRole as string | undefined;
+  if (userRole === 'System Administrator') {
+    return true;
+  }
+
+  const userId = (req as any).userId as string | undefined;
+  if (!userId) {
+    return false;
+  }
+
+  try {
+    const requestingUser = await getUserById(userId);
+    return !!requestingUser && requestingUser.role === 'System Administrator';
+  } catch (error: any) {
+    console.error('Error checking admin status:', error);
+    // In case of error, deny admin access for safety
+    return false;
   }
 }
 
@@ -383,16 +431,16 @@ router.put('/auth/profile', authenticateToken, async (req: Request, res: Respons
 // IT Admin: List users
 router.get('/auth/users', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId;
-    const requestingUser = await getUserById(userId);
-    if (!requestingUser || requestingUser.role !== 'System Administrator') {
+    if (!(await ensureSystemAdmin(req))) {
       return res.status(403).json({ error: 'Admin privileges required' });
     }
 
     const users = await getUsers();
     res.json(users);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('List users error:', error);
+    const errorMessage = error?.message || error?.detail || error?.code || String(error) || 'Internal server error';
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -402,8 +450,7 @@ router.post('/auth/users', authenticateToken, async (req: Request, res: Response
     const userId = (req as any).userId;
     const { email, password, firstName, lastName, department, role, profilePictureUrl, isActive } = req.body;
 
-    const requestingUser = await getUserById(userId);
-    if (!requestingUser || requestingUser.role !== 'System Administrator') {
+    if (!(await ensureSystemAdmin(req))) {
       return res.status(403).json({ error: 'Admin privileges required' });
     }
 
@@ -458,8 +505,7 @@ router.put('/auth/users/:id', authenticateToken, async (req: Request, res: Respo
     const userId = (req as any).userId;
     const { firstName, lastName, department, role, profilePictureUrl, isActive, resetPassword } = req.body;
 
-    const requestingUser = await getUserById(userId);
-    if (!requestingUser || requestingUser.role !== 'System Administrator') {
+    if (!(await ensureSystemAdmin(req))) {
       return res.status(403).json({ error: 'Admin privileges required' });
     }
 
@@ -508,8 +554,7 @@ router.put('/auth/users/:id', authenticateToken, async (req: Request, res: Respo
 router.delete('/auth/users/:id', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).userId;
-    const requestingUser = await getUserById(userId);
-    if (!requestingUser || requestingUser.role !== 'System Administrator') {
+    if (!(await ensureSystemAdmin(req))) {
       return res.status(403).json({ error: 'Admin privileges required' });
     }
 
@@ -533,7 +578,9 @@ router.delete('/auth/users/:id', authenticateToken, async (req: Request, res: Re
 
     res.json(deletedUser);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('Delete user account error:', error);
+    const errorMessage = error?.message || error?.detail || error?.code || String(error) || 'Internal server error';
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -541,8 +588,7 @@ router.delete('/auth/users/:id', authenticateToken, async (req: Request, res: Re
 router.patch('/auth/users/:id/clear-profile', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).userId;
-    const requestingUser = await getUserById(userId);
-    if (!requestingUser || requestingUser.role !== 'System Administrator') {
+    if (!(await ensureSystemAdmin(req))) {
       return res.status(403).json({ error: 'Admin privileges required' });
     }
 
@@ -566,7 +612,9 @@ router.patch('/auth/users/:id/clear-profile', authenticateToken, async (req: Req
 
     res.json(clearedUser);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('Clear user profile error:', error);
+    const errorMessage = error?.message || error?.detail || error?.code || String(error) || 'Internal server error';
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -576,8 +624,7 @@ router.patch('/auth/users/:id/status', authenticateToken, async (req: Request, r
     const userId = (req as any).userId;
     const { isActive } = req.body;
 
-    const requestingUser = await getUserById(userId);
-    if (!requestingUser || requestingUser.role !== 'System Administrator') {
+    if (!(await ensureSystemAdmin(req))) {
       return res.status(403).json({ error: 'Admin privileges required' });
     }
 
@@ -601,7 +648,9 @@ router.patch('/auth/users/:id/status', authenticateToken, async (req: Request, r
 
     res.json(updatedUser);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('Update user status error:', error);
+    const errorMessage = error?.message || error?.detail || error?.code || String(error) || 'Internal server error';
+    res.status(500).json({ error: errorMessage });
   }
 });
 

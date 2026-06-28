@@ -25,6 +25,7 @@ import {
 import { UserRole } from '../types';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject, type FirebaseStorage } from 'firebase/storage';
 import { auth, firestore, storage, isConfigured } from '../firebase';
+import { getApiUrl } from './apiConfig';
 
 const USE_FIREBASE_MOCK = import.meta.env.VITE_USE_FIREBASE_MOCK === 'true';
 
@@ -240,40 +241,72 @@ class FirebaseAuthService {
     }
   }
 
+  private getAuthErrorMessage(error: unknown, fallback = 'Authentication failed'): string {
+    if (error instanceof Error && error.message) {
+      return error.message;
+    }
+
+    if (typeof error === 'string' && error.trim()) {
+      return error;
+    }
+
+    if (typeof error === 'object' && error !== null && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
+      const message = (error as { message?: string }).message;
+      if (message?.trim()) {
+        return message;
+      }
+    }
+
+    return fallback;
+  }
+
   /**
-   * Fallback: Login via server API instead of Firebase
-   * Used when Firebase is unavailable or user is server-only
+   * Authenticate via the server API.
+   * This is the primary login path for the app and is used when Firebase is unavailable or the user is server-only.
    */
   private async serverLogin(email: string, password: string): Promise<AuthResponse> {
-    const apiBase = import.meta.env.VITE_API_URL || '/api';
-    const response = await fetch(`${apiBase}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
+    try {
+      const response = await fetch(getApiUrl('/auth/login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password })
+      });
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error || 'Server login failed');
+      let data: any = {};
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.error || data?.message || 'Authentication failed');
+      }
+
+      const token = data?.token || data?.accessToken || data?.access_token;
+      const user = data?.user;
+
+      if (!token || !user) {
+        throw new Error('Invalid server response: missing token or user');
+      }
+
+      // Store token and user
+      localStorage.setItem(this.tokenKey, token);
+      this.setUser(user);
+
+      return {
+        token,
+        expiresIn: data?.expiresIn || data?.expires_in || '24h',
+        user
+      };
+    } catch (error: unknown) {
+      const message = this.getAuthErrorMessage(error);
+      if (/fetch|network|failed to fetch|ECONNREFUSED|timed out/i.test(message)) {
+        throw new Error('Unable to reach the server. Please check your connection and try again.');
+      }
+      throw new Error(message || 'Authentication failed');
     }
-
-    const data = await response.json();
-    const token = data.token || data.access_token;
-    const user = data.user;
-
-    if (!token || !user) {
-      throw new Error('Invalid server response: missing token or user');
-    }
-
-    // Store token and user
-    localStorage.setItem(this.tokenKey, token);
-    this.setUser(user);
-
-    return {
-      token,
-      expiresIn: data.expiresIn || '24h',
-      user
-    };
   }
 
   /**
@@ -281,66 +314,61 @@ class FirebaseAuthService {
    * Tries Firebase first, falls back to server auth on credential errors
    */
   async login(email: string, password: string): Promise<AuthResponse> {
-    if (USE_FIREBASE_MOCK || !isConfigured || !auth || !firestore) {
-      if (USE_FIREBASE_MOCK) {
-        const mockUsersKey = 'mock_users';
-        const usersJson = localStorage.getItem(mockUsersKey) || '[]';
-        const users = JSON.parse(usersJson) as any[];
-        const match = users.find(u => u.email === email && u.password === password);
-        if (match) {
-          const user: AuthUser = {
-            id: match.id,
-            email: match.email,
-            first_name: match.first_name,
-            last_name: match.last_name,
-            department: match.department,
-            portal_identity: match.portal_identity,
-            role: match.role,
-            profile_picture_url: match.profile_picture_url,
-            is_active: match.is_active,
-            is_verified: match.is_verified,
-            created_at: match.created_at
-          };
-          const token = `mock-token-${Date.now()}`;
-          localStorage.setItem(this.tokenKey, token);
-          this.setUser(user);
-          return { token, expiresIn: '0', user };
-        }
-        console.log('Mock login did not find a local user; attempting server login fallback...');
-        return this.serverLogin(email, password);
+    if (USE_FIREBASE_MOCK) {
+      const mockUsersKey = 'mock_users';
+      const usersJson = localStorage.getItem(mockUsersKey) || '[]';
+      const users = JSON.parse(usersJson) as any[];
+      const match = users.find(u => u.email === email && u.password === password);
+      if (match) {
+        const user: AuthUser = {
+          id: match.id,
+          email: match.email,
+          first_name: match.first_name,
+          last_name: match.last_name,
+          department: match.department,
+          portal_identity: match.portal_identity,
+          role: match.role,
+          profile_picture_url: match.profile_picture_url,
+          is_active: match.is_active,
+          is_verified: match.is_verified,
+          created_at: match.created_at
+        };
+        const token = `mock-token-${Date.now()}`;
+        localStorage.setItem(this.tokenKey, token);
+        this.setUser(user);
+        return { token, expiresIn: '0', user };
       }
-
-      // Firebase not configured; try server fallback
-      console.log('Firebase not configured, attempting server login...');
-      return this.serverLogin(email, password);
     }
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const firebaseUser = userCredential.user;
+      return await this.serverLogin(email, password);
+    } catch (serverError: unknown) {
+      if (!isConfigured || !auth || !firestore) {
+        throw new Error(this.getAuthErrorMessage(serverError, 'Authentication failed'));
+      }
 
-      // Get user data from Firestore
-      const user = await this.ensureUserProfile(firebaseUser);
-      const token = await firebaseUser.getIdToken();
-      const expiresIn = '1h';
-
-      // Store token in localStorage for authClient to use in admin API calls
-      localStorage.setItem(this.tokenKey, token);
-      this.setUser(user);
-
-      return {
-        token,
-        expiresIn,
-        user
-      };
-    } catch (error: any) {
-      console.error('Firebase login error:', error?.code || 'no-code', error?.message || String(error), error);
-      console.log('Firebase auth failed, attempting server login fallback...');
       try {
-        return await this.serverLogin(email, password);
-      } catch (serverErr: any) {
-        console.error('Server login fallback failed:', serverErr?.message || serverErr);
-        throw new Error(serverErr?.message || error?.message || 'Login failed');
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const firebaseUser = userCredential.user;
+
+        // Get user data from Firestore
+        const user = await this.ensureUserProfile(firebaseUser);
+        const token = await firebaseUser.getIdToken();
+        const expiresIn = '1h';
+
+        // Store token in localStorage for authClient to use in admin API calls
+        localStorage.setItem(this.tokenKey, token);
+        this.setUser(user);
+
+        return {
+          token,
+          expiresIn,
+          user
+        };
+      } catch (firebaseError: unknown) {
+        const firebaseMessage = this.getAuthErrorMessage(firebaseError);
+        const serverMessage = this.getAuthErrorMessage(serverError);
+        throw new Error(firebaseMessage || serverMessage || 'Authentication failed');
       }
     }
   }

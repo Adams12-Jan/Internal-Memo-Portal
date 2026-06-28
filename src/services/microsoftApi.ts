@@ -20,13 +20,15 @@ export interface MicrosoftSignActionResult {
   message: string;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE || '/api';
+import { getApiUrl } from './apiConfig';
+
+const API_BASE = '/api';
 
 export async function uploadFileToBackend(file: File): Promise<BackendUploadResult> {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(`${API_BASE}/files/upload`, {
+  const response = await fetch(getApiUrl('/files/upload'), {
     method: 'POST',
     body: formData
   });
@@ -44,7 +46,7 @@ export async function uploadFileToMicrosoft(file: File, destination: 'onedrive' 
   formData.append('file', file);
   formData.append('destination', destination);
 
-  const response = await fetch(`${API_BASE}/microsoft/upload`, {
+  const response = await fetch(getApiUrl('/microsoft/upload'), {
     method: 'POST',
     body: formData
   });
@@ -62,7 +64,7 @@ export async function requestMicrosoftSign(file: File, signerName: string): Prom
   formData.append('file', file);
   formData.append('signerName', signerName);
 
-  const response = await fetch(`${API_BASE}/microsoft/sign`, {
+  const response = await fetch(getApiUrl('/microsoft/sign'), {
     method: 'POST',
     body: formData
   });

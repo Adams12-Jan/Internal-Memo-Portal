@@ -43,7 +43,14 @@ const upload = multer({
   }
 });
 
-app.use(cors());
+// Configure CORS to allow credentials
+const isDevMode = process.env.NODE_ENV !== 'production';
+app.use(cors({
+  origin: isDevMode ? ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173'] : process.env.CORS_ORIGIN || '*',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Dev-User-Id', 'X-Dev-Admin', 'X-Access-Token']
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(uploadsDir));

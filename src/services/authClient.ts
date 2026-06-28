@@ -1,4 +1,6 @@
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+import { getApiUrl } from './apiConfig';
+
+const API_BASE = '/api';
 
 export interface AuthUser {
   id: string;
@@ -53,7 +55,7 @@ class AuthService {
         }
       }
 
-      const response = await fetch(`${API_BASE}/auth/register`, {
+      const response = await fetch(getApiUrl('/auth/register'), {
         method: 'POST',
         body: formData
         // Don't set Content-Type header; let the browser set it with boundary
@@ -78,7 +80,7 @@ class AuthService {
       }
     } else {
       // Original JSON-based registration
-      const response = await fetch(`${API_BASE}/auth/register`, {
+      const response = await fetch(getApiUrl('/auth/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, firstName, lastName, department })
@@ -105,7 +107,7 @@ class AuthService {
   }
 
   async login(email: string, password: string): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE}/auth/login`, {
+    const response = await fetch(getApiUrl('/auth/login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -123,7 +125,7 @@ class AuthService {
   }
 
   async requestPasswordReset(email: string): Promise<{ resetToken?: string; message?: string }> {
-    const response = await fetch(`${API_BASE}/auth/forgot-password`, {
+    const response = await fetch(getApiUrl('/auth/forgot-password'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
@@ -138,7 +140,7 @@ class AuthService {
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
-    const response = await fetch(`${API_BASE}/auth/reset-password`, {
+    const response = await fetch(getApiUrl('/auth/reset-password'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token, newPassword })
@@ -151,7 +153,7 @@ class AuthService {
   }
 
   async verifyEmail(token: string): Promise<void> {
-    const response = await fetch(`${API_BASE}/auth/verify-email`, {
+    const response = await fetch(getApiUrl('/auth/verify-email'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token })
@@ -164,11 +166,19 @@ class AuthService {
   }
 
   async getUsers(): Promise<AuthUser[]> {
-    const response = await this.fetchWithAuth(`${API_BASE}/auth/users`);
+    const response = await this.fetchWithAuth(getApiUrl('/auth/users'));
     if (!response.ok) {
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await response.json().catch(() => null);
+        const message = data?.error || data?.message || JSON.stringify(data) || response.statusText;
+        throw new Error(message || 'Failed to fetch users');
+      }
+
       const text = await response.text();
-      throw new Error(text || 'Failed to fetch users');
+      throw new Error(text || response.statusText || 'Failed to fetch users');
     }
+
     return response.json();
   }
 
@@ -181,7 +191,7 @@ class AuthService {
     isActive?: boolean;
     resetPassword?: string;
   }): Promise<AuthUser> {
-    const response = await this.fetchWithAuth(`${API_BASE}/auth/users/${encodeURIComponent(userId)}`, {
+    const response = await this.fetchWithAuth(getApiUrl(`/auth/users/${encodeURIComponent(userId)}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates)
@@ -190,6 +200,21 @@ class AuthService {
     if (!response.ok) {
       const data = await response.json();
       throw new Error(data.error || 'Failed to update user');
+    }
+
+    return response.json();
+  }
+
+  async toggleUserStatus(userId: string, isActive: boolean): Promise<AuthUser> {
+    const response = await this.fetchWithAuth(getApiUrl(`/auth/users/${encodeURIComponent(userId)}/status`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive })
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to toggle user status');
     }
 
     return response.json();
@@ -205,7 +230,7 @@ class AuthService {
     profilePictureUrl?: string;
     isActive?: boolean;
   }): Promise<AuthUser> {
-    const response = await this.fetchWithAuth(`${API_BASE}/auth/users`, {
+    const response = await this.fetchWithAuth(getApiUrl('/auth/users'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(user)
@@ -239,7 +264,7 @@ class AuthService {
   }
 
   async deleteUser(userId: string): Promise<AuthUser> {
-    const response = await this.fetchWithAuth(`${API_BASE}/auth/users/${encodeURIComponent(userId)}`, {
+    const response = await this.fetchWithAuth(getApiUrl(`/auth/users/${encodeURIComponent(userId)}`), {
       method: 'DELETE'
     });
 
@@ -252,7 +277,7 @@ class AuthService {
   }
 
   async clearUserProfile(userId: string): Promise<AuthUser> {
-    const response = await this.fetchWithAuth(`${API_BASE}/auth/users/${encodeURIComponent(userId)}/clear-profile`, {
+    const response = await this.fetchWithAuth(getApiUrl(`/auth/users/${encodeURIComponent(userId)}/clear-profile`), {
       method: 'PATCH'
     });
 
@@ -298,15 +323,12 @@ class AuthService {
       ...this.getAuthHeader()
     };
 
-    if (!headers.Authorization && typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && import.meta.env.DEV) {
       const currentUserJson = window.localStorage.getItem(this.userKey);
       if (currentUserJson) {
         try {
           const currentUser = JSON.parse(currentUserJson) as AuthUser & { portal_identity?: string };
-          if (
-            process.env.NODE_ENV === 'development' &&
-            (currentUser.role === 'System Administrator' || currentUser.portal_identity === 'IT Support')
-          ) {
+          if (currentUser.role === 'System Administrator' || currentUser.portal_identity === 'IT Support') {
             headers['X-Dev-Admin'] = 'true';
             headers['X-Dev-User-Id'] = currentUser.id;
           }
@@ -316,12 +338,39 @@ class AuthService {
       }
     }
 
-    const response = await fetch(input, {
-      ...init,
-      headers
-    });
+    try {
+      const response = await fetch(input, {
+        ...init,
+        headers
+      });
+      return response;
+    } catch (err: any) {
+      // Network error (e.g., ECONNREFUSED / failed to fetch). Attempt a relative /api fallback.
+      const inputStr = typeof input === 'string' ? input : (input as Request).url || '';
+      let fallbackPath = '/api';
+      try {
+        const idx = inputStr.indexOf('/api');
+        if (idx >= 0) {
+          fallbackPath = inputStr.slice(idx);
+        } else if (inputStr.startsWith('/')) {
+          fallbackPath = `/api${inputStr}`;
+        } else if (inputStr) {
+          fallbackPath = `/api/${inputStr}`;
+        }
+      } catch {
+        fallbackPath = '/api';
+      }
 
-    return response;
+      try {
+        const response2 = await fetch(fallbackPath, {
+          ...init,
+          headers
+        });
+        return response2;
+      } catch (err2) {
+        throw err;
+      }
+    }
   }
 
   async getCurrentUser(): Promise<AuthUser> {
@@ -330,7 +379,7 @@ class AuthService {
       throw new Error('No token found');
     }
 
-    const response = await this.fetchWithAuth(`${API_BASE}/auth/me`);
+    const response = await this.fetchWithAuth(getApiUrl('/auth/me'));
 
     if (!response.ok) {
       this.logout();
@@ -353,7 +402,7 @@ class AuthService {
       throw new Error('No token found');
     }
 
-    const response = await this.fetchWithAuth(`${API_BASE}/auth/profile`, {
+    const response = await this.fetchWithAuth(getApiUrl('/auth/profile'), {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'

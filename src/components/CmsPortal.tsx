@@ -466,7 +466,7 @@ export default function CmsPortal({
     }
 
     try {
-      await authClient.updateUser(user.id, { isActive: !user.is_active });
+      await authClient.toggleUserStatus(user.id, !user.is_active);
       fetchUsers();
       alert(`User account ${user.is_active ? 'disabled' : 'enabled'} successfully.`);
     } catch (err: any) {
@@ -1392,9 +1392,13 @@ export default function CmsPortal({
                     <div className="flex flex-col sm:flex-row gap-2">
                       <button
                         onClick={() => handleToggleUserActive(user)}
-                        className="text-[10px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded px-3 py-2 hover:bg-slate-200"
+                        className={`text-[10px] font-semibold rounded px-3 py-2 ${
+                          user.is_active
+                            ? 'text-slate-700 bg-slate-100 border border-slate-200 hover:bg-slate-200'
+                            : 'text-emerald-700 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100'
+                        }`}
                       >
-                        {user.is_active ? 'Disable' : 'Enable'}
+                        {user.is_active ? 'Disable Account' : 'Enable Account'}
                       </button>
                       <button
                         onClick={() => handleResetUserPassword(user)}

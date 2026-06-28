@@ -3,15 +3,16 @@
     {
       "id": "ceaececd-9448-44b6-8ac7-548f99528245",
       "email": "admin@test.com",
-      "first_name": "Admin",
-      "last_name": "Test",
-      "department": "IT Systems",
+      "first_name": "",
+      "last_name": "",
+      "department": "",
       "role": "System Administrator",
       "profile_picture_url": null,
       "is_active": true,
       "is_verified": false,
       "created_at": "2026-06-25T16:04:59.431Z",
-      "password_hash": "$2b$10$DvlLW/dZhKsqHIK.GJJwf.YO.k201ua2UWdc8mSFCikOd3/59Yc4m"
+      "password_hash": "$2b$10$DvlLW/dZhKsqHIK.GJJwf.YO.k201ua2UWdc8mSFCikOd3/59Yc4m",
+      "updated_at": "2026-06-28T20:10:08.164Z"
     },
     {
       "id": "e7f3d24c-0525-4fa9-822f-1d0b007df779",
@@ -25,7 +26,7 @@
       "created_at": "2026-06-25T16:06:09.321Z",
       "password_hash": "$2b$10$welELq1koppmQ7ANA5nwfOs7yunzAWHGEpFA1P26gbJVrvW4Zn77C",
       "profile_picture_url": null,
-      "updated_at": "2026-06-26T03:15:03.961Z"
+      "updated_at": "2026-06-28T20:18:31.240Z"
     },
     {
       "id": "88d44fdb-c095-4ad0-98cc-68b18104bca6",
@@ -37,7 +38,8 @@
       "is_active": true,
       "is_verified": false,
       "created_at": "2026-06-25T16:18:45.102Z",
-      "password_hash": "$2b$10$nz.lctPOIttlhrxO4xuu7e/kZRpjWRNb1LSQKOUB5kePYPi1M6ICO"
+      "password_hash": "$2b$10$l44de6IwgMP/KVxGQIduYOxtYfm3z/9JE7hwJrFqoPSu8N4mOjogK",
+      "updated_at": "2026-06-28T20:09:23.420Z"
     }
   ],
   "emailTokens": [
