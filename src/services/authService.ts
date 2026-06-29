@@ -9,6 +9,16 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 const JWT_EXPIRY = '7d';
 const RESET_TOKEN_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
 
+export function resolveRegistrationRole(options: { isFirstUser: boolean; department?: string | null }): string {
+  const normalizedDepartment = (options.department || '').trim().toLowerCase();
+  const isAdminRegistration =
+    normalizedDepartment.includes('it support') ||
+    normalizedDepartment.includes('it & systems') ||
+    normalizedDepartment.includes('system administrator');
+
+  return options.isFirstUser || isAdminRegistration ? 'System Administrator' : 'Initiator';
+}
+
 export interface User {
   id: string;
   email: string;
@@ -192,12 +202,8 @@ export async function registerUser(
     }
 
     const countResult = await query('SELECT COUNT(*) FROM users');
-    const firstUser = countResult.rows[0]?.count === '0';
-    if (!firstUser) {
-      throw new Error('Self-registration is disabled. Please contact IT Support or your System Administrator to create an account.');
-    }
-
-    const role = 'System Administrator';
+    const userCount = Number(countResult.rows[0]?.count || 0);
+    const role = resolveRegistrationRole({ isFirstUser: userCount === 0, department });
     const passwordHash = await bcrypt.hash(password, 10);
 
     const result = await query(
@@ -229,10 +235,7 @@ export async function registerUser(
       throw new Error('Email already registered');
     }
 
-    const allowDevSignupAnyway = process.env.NODE_ENV !== 'production' && department === 'IT Support';
-    if (devData.users.length > 0 && !allowDevSignupAnyway) {
-      throw new Error('Self-registration is disabled. Please contact IT Support or your System Administrator to create an account.');
-    }
+    const role = resolveRegistrationRole({ isFirstUser: devData.users.length === 0, department });
 
     const passwordHash = await bcrypt.hash(password, 10);
     const id = crypto.randomUUID?.() || crypto.randomBytes(16).toString('hex');
@@ -244,7 +247,7 @@ export async function registerUser(
       first_name: firstName,
       last_name: lastName,
       department: department || 'Administration',
-      role: 'System Administrator',
+      role,
       profile_picture_url: profilePictureUrl || undefined,
       is_active: true,
       is_verified: false,

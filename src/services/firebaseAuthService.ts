@@ -120,11 +120,6 @@ class FirebaseAuthService {
         throw new Error('That email is already registered. Please login or use a different address.');
       }
       
-      // Only allow registration if no users exist
-      if (users.length > 0) {
-        throw new Error('Self-registration is disabled. Please contact IT Support or your System Administrator to create an account.');
-      }
-      
       const id = `mock-${Date.now()}`;
       const user: AuthUser = {
         id,
@@ -148,12 +143,6 @@ class FirebaseAuthService {
     }
 
     try {
-      // Check if users already exist in Firestore
-      const usersSnapshot = await getDocs(collection(firestore, 'users'));
-      if (usersSnapshot.size > 0) {
-        throw new Error('Self-registration is disabled. Please contact IT Support or your System Administrator to create an account.');
-      }
-
       // Create Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
